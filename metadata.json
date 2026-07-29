@@ -1,0 +1,8 @@
+{
+  "name": "BrainVerse - MindForge(developed by Jeevu)",
+  "description": "it\u0027s all about improving your IQ and also developing your focus, concentration by solving the quizzes, puzzles, memory games etc..",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
