@@ -50,6 +50,7 @@ export interface RealtimeRoomData {
 
 // Ensure User Document exists in Firestore & listen real-time
 export function subscribeToUserProfile(userId: string, onUpdate: (profile: UserProfile) => void) {
+  if (!userId) return () => {};
   const userRef = doc(db, 'users', userId);
   
   return onSnapshot(userRef, (snapshot) => {
@@ -62,7 +63,7 @@ export function subscribeToUserProfile(userId: string, onUpdate: (profile: UserP
       } as UserProfile);
     }
   }, (err) => {
-    console.warn('Firestore user profile snapshot error:', err);
+    console.warn('Firestore user profile snapshot notice (offline mode fallback active):', err.message);
   });
 }
 

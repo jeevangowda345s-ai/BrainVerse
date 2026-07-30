@@ -18,7 +18,8 @@ import {
   Volume2,
   VolumeX,
   User,
-  UserPlus
+  UserPlus,
+  LogOut
 } from 'lucide-react';
 import { UserProfile, ThemeSettings } from '../types';
 import { audioHaptics } from '../utils/audioHaptics';
@@ -32,6 +33,7 @@ interface NavbarProps {
   onOpenSettings: () => void;
   onOpenAdmin: () => void;
   onOpenAuth: () => void;
+  onSignOut: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -43,6 +45,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenSettings,
   onOpenAdmin,
   onOpenAuth,
+  onSignOut,
 }) => {
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Brain },
@@ -75,11 +78,12 @@ export const Navbar: React.FC<NavbarProps> = ({
   };
 
   const toggleSound = () => {
-    audioHaptics.playClick();
-    audioHaptics.triggerHaptic('tap');
     const newSound = !theme.soundEnabled;
     setTheme(prev => ({ ...prev, soundEnabled: newSound }));
     audioHaptics.setPreferences(newSound, theme.hapticsEnabled);
+    if (newSound) {
+      audioHaptics.playClick();
+    }
   };
 
   return (
@@ -164,13 +168,28 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span className="text-xs font-mono font-bold text-purple-300">LVL {user.level}</span>
             </div>
 
-            {/* Quick Toggle Controls */}
+            {/* Quick Access Sound Toggle Button */}
             <button
               onClick={toggleSound}
-              className="p-2 rounded-xl bg-[#0A0A0C] border border-[#1A1A1A] text-[#888888] hover:text-[#00F5FF] hover:border-[#00F5FF]/30 transition-all"
-              title={theme.soundEnabled ? 'Mute Audio' : 'Enable Audio'}
+              className={`flex items-center gap-1.5 px-2.5 py-2 rounded-xl border text-xs font-bold transition-all ${
+                theme.soundEnabled
+                  ? 'bg-[#00F5FF]/10 border-[#00F5FF]/40 text-[#00F5FF] hover:bg-[#00F5FF]/20 shadow-[0_0_10px_rgba(0,245,255,0.15)]'
+                  : 'bg-[#0A0A0C] border-[#1A1A1A] text-slate-500 hover:text-slate-300 hover:border-slate-700'
+              }`}
+              title={theme.soundEnabled ? 'Mute Sound Effects' : 'Enable Sound Effects'}
+              aria-label={theme.soundEnabled ? 'Mute Sound Effects' : 'Enable Sound Effects'}
             >
-              {theme.soundEnabled ? <Volume2 className="w-4 h-4 text-[#00F5FF]" /> : <VolumeX className="w-4 h-4 text-[#555555]" />}
+              {theme.soundEnabled ? (
+                <>
+                  <Volume2 className="w-4 h-4 text-[#00F5FF]" />
+                  <span className="hidden sm:inline">Sound</span>
+                </>
+              ) : (
+                <>
+                  <VolumeX className="w-4 h-4 text-slate-500" />
+                  <span className="hidden sm:inline text-slate-500">Muted</span>
+                </>
+              )}
             </button>
 
             <button
@@ -195,7 +214,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               onClick={onOpenAuth}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#00F5FF]/20 to-purple-600/20 border border-[#00F5FF]/40 text-[#00F5FF] hover:border-[#00F5FF] hover:bg-[#00F5FF]/30 transition text-xs font-bold shadow-[0_0_12px_rgba(0,245,255,0.15)]"
-              title={user.email ? `Logged in as ${user.email}` : 'Register / Login Account'}
+              title={user.email ? `Logged in as ${user.email}` : 'Account Details'}
             >
               {user.email ? (
                 <>
@@ -205,9 +224,19 @@ export const Navbar: React.FC<NavbarProps> = ({
               ) : (
                 <>
                   <UserPlus className="w-4 h-4" />
-                  <span className="hidden sm:inline">Register / Login</span>
+                  <span className="hidden sm:inline">Account</span>
                 </>
               )}
+            </button>
+
+            {/* Sign Out Button */}
+            <button
+              onClick={onSignOut}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[#0A0A0C] border border-[#1A1A1A] text-slate-400 hover:text-rose-400 hover:border-rose-500/40 transition text-xs font-bold"
+              title="Sign Out / Change Account"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span className="hidden md:inline">Sign Out</span>
             </button>
 
             {/* User Avatar */}
@@ -216,9 +245,24 @@ export const Navbar: React.FC<NavbarProps> = ({
               className="flex items-center gap-2 pl-1 cursor-pointer group"
               title={`${user.name} (${user.email || 'Guest Player'})`}
             >
-              <div className="w-9 h-9 rounded-xl bg-[#00F5FF]/20 p-0.5 border border-[#00F5FF]/40 group-hover:border-[#00F5FF] transition shadow-[0_0_10px_rgba(0,245,255,0.2)]">
-                <div className="w-full h-full rounded-[10px] bg-[#050505] flex items-center justify-center text-lg font-bold">
-                  {user.avatar || '🧠'}
+              <div className="w-9 h-9 rounded-xl bg-[#00F5FF]/20 p-0.5 border border-[#00F5FF]/40 group-hover:border-[#00F5FF] transition shadow-[0_0_10px_rgba(0,245,255,0.2)] overflow-hidden">
+                <div className="w-full h-full rounded-[10px] bg-[#050505] flex items-center justify-center text-lg font-bold overflow-hidden">
+                  {user.avatar && (user.avatar.startsWith('http') || user.avatar.startsWith('data:') || user.avatar.includes('/')) ? (
+                    <img 
+                      src={user.avatar} 
+                      alt={user.name} 
+                      className="w-full h-full object-cover rounded-[8px]" 
+                      referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                        if (e.currentTarget.parentElement) {
+                          e.currentTarget.parentElement.innerText = '🧠';
+                        }
+                      }}
+                    />
+                  ) : (
+                    user.avatar || '🧠'
+                  )}
                 </div>
               </div>
             </div>

@@ -11,7 +11,8 @@ import {
   User as FirebaseUser
 } from 'firebase/auth';
 import { 
-  getFirestore, 
+  initializeFirestore,
+  memoryLocalCache,
   doc, 
   getDoc, 
   setDoc, 
@@ -40,12 +41,36 @@ const firebaseConfig = {
   appId: firebaseConfigJson.appId,
 };
 
-// Initialize Firebase
+// Initialize Firebase App
+if (typeof window !== 'undefined' && window.localStorage) {
+  try {
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const key = window.localStorage.key(i);
+      if (key && (key.startsWith('firestore') || key.startsWith('firebase'))) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach((key) => window.localStorage.removeItem(key));
+  } catch (e) {
+    console.warn('Could not clean firestore storage quota:', e);
+  }
+}
+
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-// Specify database ID if designated in config
+// Specify database ID and initialize Firestore with robust long polling & local caching
 const dbId = firebaseConfigJson.firestoreDatabaseId;
-export const db = dbId ? getFirestore(app, dbId) : getFirestore(app);
+
+export const db = initializeFirestore(
+  app,
+  {
+    experimentalAutoDetectLongPolling: true,
+    localCache: memoryLocalCache(),
+  },
+  dbId || undefined
+);
+
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 
@@ -73,3 +98,4 @@ export {
   getDocs
 };
 export type { FirebaseUser };
+

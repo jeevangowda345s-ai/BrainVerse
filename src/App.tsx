@@ -16,6 +16,7 @@ import { AdminPanel } from './components/AdminPanel';
 import { OnboardingModal } from './components/OnboardingModal';
 import { SettingsModal } from './components/SettingsModal';
 import { AuthModal } from './components/AuthModal';
+import { AuthScreen } from './components/AuthScreen';
 
 // Mini Games
 import { MemoryMatrix } from './components/games/MemoryMatrix';
@@ -83,11 +84,16 @@ export default function App() {
   const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
   const [unlockedToastAchievement, setUnlockedToastAchievement] = useState<Achievement | null>(null);
 
+  // Authentication Enforcement State
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [authChecked, setAuthChecked] = useState<boolean>(false);
+
   // Subscribe to Firebase Auth state & Firestore real-time User Profile sync
   useEffect(() => {
     let unsubProfile: (() => void) | null = null;
     const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
+        setIsAuthenticated(true);
         if (unsubProfile) unsubProfile();
         unsubProfile = subscribeToUserProfile(firebaseUser.uid, (firestoreProfile) => {
           if (firestoreProfile) {
@@ -100,14 +106,14 @@ export default function App() {
           }
         });
       } else {
-        try {
-          await signInAnonymously(auth);
-        } catch (err: any) {
-          if (err?.code !== 'auth/operation-not-allowed' && !err?.message?.includes('operation-not-allowed')) {
-            console.warn('Auto anonymous auth initialization error:', err);
-          }
+        // If guest profile or local session exists
+        if (user.id && user.id.startsWith('guest_')) {
+          setIsAuthenticated(true);
+        } else {
+          setIsAuthenticated(false);
         }
       }
+      setAuthChecked(true);
     });
 
     return () => {
@@ -115,6 +121,16 @@ export default function App() {
       if (unsubProfile) unsubProfile();
     };
   }, []);
+
+  const handleSignOut = async () => {
+    try {
+      await auth.signOut();
+    } catch (err) {}
+    setUser(DEFAULT_USER);
+    setIsAuthenticated(false);
+    setActiveTab('dashboard');
+    setActiveGameId(null);
+  };
 
   // Handle User Profile Updates (Streak, Coins, Wheel, Settings)
   const handleUpdateUser = (updatedUser: UserProfile) => {
@@ -319,6 +335,29 @@ export default function App() {
     window.location.reload();
   };
 
+  // Show Loading screen while Firebase Auth checks session
+  if (!authChecked) {
+    return (
+      <div className="min-h-screen bg-[#050508] text-white flex flex-col items-center justify-center space-y-4">
+        <div className="w-12 h-12 border-4 border-[#00F5FF]/20 border-t-[#00F5FF] rounded-full animate-spin" />
+        <p className="text-xs font-mono text-slate-400 animate-pulse">Initializing BrainVerse Platform...</p>
+      </div>
+    );
+  }
+
+  // Enforce Registration & Login Page when user is not authenticated
+  if (!isAuthenticated) {
+    return (
+      <AuthScreen
+        currentUser={user}
+        onAuthSuccess={(newProfile) => {
+          setUser(newProfile);
+          setIsAuthenticated(true);
+        }}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen font-sans bg-[#050505] text-[#E0E0E0] bg-grid-pattern transition-colors duration-300">
       
@@ -327,7 +366,7 @@ export default function App() {
         <OnboardingModal user={user} onComplete={handleCompleteOnboarding} />
       )}
 
-      {/* Auth Modal (Register & Login) */}
+      {/* Auth Modal (Register & Login Details) */}
       <AuthModal
         isOpen={showAuthModal}
         onClose={() => setShowAuthModal(false)}
@@ -345,6 +384,7 @@ export default function App() {
         onOpenSettings={() => setShowSettings(true)}
         onOpenAdmin={() => setShowAdminModal(true)}
         onOpenAuth={() => setShowAuthModal(true)}
+        onSignOut={handleSignOut}
       />
 
       {/* Main View Area */}

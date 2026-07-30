@@ -275,8 +275,23 @@ export const MultiplayerHub: React.FC<MultiplayerHubProps> = ({ user }) => {
                   }`}>
                     #{idx + 1}
                   </span>
-                  <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center text-sm">
-                    {player.avatar || '🧠'}
+                  <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center text-sm overflow-hidden shrink-0">
+                    {player.avatar && (player.avatar.startsWith('http') || player.avatar.startsWith('data:') || player.avatar.includes('/')) ? (
+                      <img 
+                        src={player.avatar} 
+                        alt={player.name} 
+                        className="w-full h-full object-cover rounded-lg" 
+                        referrerPolicy="no-referrer"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                          if (e.currentTarget.parentElement) {
+                            e.currentTarget.parentElement.innerText = '🧠';
+                          }
+                        }}
+                      />
+                    ) : (
+                      player.avatar || '🧠'
+                    )}
                   </div>
                   <div>
                     <div className="text-xs font-bold text-white">{player.name}</div>
