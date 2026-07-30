@@ -106,12 +106,8 @@ export default function App() {
           }
         });
       } else {
-        // If guest profile or local session exists
-        if (user.id && user.id.startsWith('guest_')) {
-          setIsAuthenticated(true);
-        } else {
-          setIsAuthenticated(false);
-        }
+        // When no active Firebase user is logged in, require Register / Login screen first
+        setIsAuthenticated(false);
       }
       setAuthChecked(true);
     });
