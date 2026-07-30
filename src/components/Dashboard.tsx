@@ -18,6 +18,7 @@ import {
 import { UserProfile, GameInfo, DailyMission, CognitiveRatings } from '../types';
 import { INITIAL_GAMES } from '../utils/storage';
 import { audioHaptics } from '../utils/audioHaptics';
+import { DailyStreakTracker } from './DailyStreakTracker';
 
 interface DashboardProps {
   user: UserProfile;
@@ -25,6 +26,7 @@ interface DashboardProps {
   onSelectGame: (gameId: string) => void;
   onNavigateTab: (tab: string) => void;
   onClaimMission: (missionId: string) => void;
+  onUpdateUser: (updatedUser: UserProfile) => void;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
@@ -33,6 +35,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onSelectGame,
   onNavigateTab,
   onClaimMission,
+  onUpdateUser,
 }) => {
   const dailyQuotes = [
     "“The mind is not a vessel to be filled, but a fire to be kindled.” — Plutarch",
@@ -143,6 +146,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
         </div>
       </div>
+
+      {/* DAILY STREAK TRACKING SYSTEM */}
+      <DailyStreakTracker user={user} onUpdateUser={onUpdateUser} />
 
       {/* AI COACH RECOMMENDATION BANNER */}
       <div className="p-5 rounded-2xl bg-[#080808] border border-[#1A1A1A] flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg">

@@ -60,8 +60,6 @@ export const MentalMath: React.FC<MentalMathProps> = ({ onBack, onFinish }) => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          setGameActive(false);
-          audioHaptics.playFanfare();
           return 0;
         }
         return prev - 1;
@@ -69,6 +67,13 @@ export const MentalMath: React.FC<MentalMathProps> = ({ onBack, onFinish }) => {
     }, 1000);
     return () => clearInterval(timer);
   }, [gameActive]);
+
+  useEffect(() => {
+    if (timeLeft === 0 && gameActive) {
+      setGameActive(false);
+      audioHaptics.playFanfare();
+    }
+  }, [timeLeft, gameActive]);
 
   const handleSelectOption = (opt: number) => {
     if (!gameActive || !problem) return;

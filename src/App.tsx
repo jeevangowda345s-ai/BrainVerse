@@ -1,6 +1,6 @@
 /**
  * BrainVerse (MindForge developed by Jeevu)
- * AI-Powered Brain Training Platform
+ * AI-Powered Brain Training Platform with Real-Time Firebase Auth & Sync
  */
 
 import React, { useState, useEffect } from 'react';
@@ -15,6 +15,7 @@ import { GamificationHub } from './components/GamificationHub';
 import { AdminPanel } from './components/AdminPanel';
 import { OnboardingModal } from './components/OnboardingModal';
 import { SettingsModal } from './components/SettingsModal';
+import { AuthModal } from './components/AuthModal';
 
 // Mini Games
 import { MemoryMatrix } from './components/games/MemoryMatrix';
@@ -51,31 +52,130 @@ import {
 } from './utils/storage';
 
 import { audioHaptics } from './utils/audioHaptics';
+import { processDailyStreak } from './utils/streak';
+import { evaluateAchievements } from './utils/achievementChecker';
+import { AchievementToast } from './components/AchievementToast';
+
+// Firebase Real-time Imports
+import { auth, onAuthStateChanged, signInAnonymously } from './lib/firebase';
+import { 
+  subscribeToUserProfile, 
+  saveUserProfileToFirestore, 
+  logGameSessionToFirestore, 
+  addCoinsInFirestore,
+  addWheelRewardsInFirestore
+} from './services/firebaseService';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [activeGameId, setActiveGameId] = useState<GameId | null>(null);
   
-  // Storage States
+  // Storage & Profile States
   const [user, setUser] = useState<UserProfile>(loadUserProfile());
   const [theme, setTheme] = useState<ThemeSettings>(loadThemeSettings());
   const [missions, setMissions] = useState<DailyMission[]>(loadDailyMissions());
   const [achievements, setAchievements] = useState<Achievement[]>(loadAchievements());
   const [sessions, setSessions] = useState<GameSessionResult[]>(loadGameSessions());
 
-  // Modals
+  // Modals & Toast State
   const [showSettings, setShowSettings] = useState<boolean>(false);
   const [showAdminModal, setShowAdminModal] = useState<boolean>(false);
+  const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
+  const [unlockedToastAchievement, setUnlockedToastAchievement] = useState<Achievement | null>(null);
 
-  // Sync to local storage
+  // Subscribe to Firebase Auth state & Firestore real-time User Profile sync
+  useEffect(() => {
+    let unsubProfile: (() => void) | null = null;
+    const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        if (unsubProfile) unsubProfile();
+        unsubProfile = subscribeToUserProfile(firebaseUser.uid, (firestoreProfile) => {
+          if (firestoreProfile) {
+            setUser(prev => ({
+              ...prev,
+              ...firestoreProfile,
+              id: firebaseUser.uid,
+              email: firebaseUser.email || prev.email,
+            }));
+          }
+        });
+      } else {
+        try {
+          await signInAnonymously(auth);
+        } catch (err: any) {
+          if (err?.code !== 'auth/operation-not-allowed' && !err?.message?.includes('operation-not-allowed')) {
+            console.warn('Auto anonymous auth initialization error:', err);
+          }
+        }
+      }
+    });
+
+    return () => {
+      unsubscribeAuth();
+      if (unsubProfile) unsubProfile();
+    };
+  }, []);
+
+  // Handle User Profile Updates (Streak, Coins, Wheel, Settings)
+  const handleUpdateUser = (updatedUser: UserProfile) => {
+    setUser(updatedUser);
+    if (updatedUser.id) {
+      saveUserProfileToFirestore(updatedUser);
+    }
+  };
+
+  // Sync to local storage & Firestore backup
   useEffect(() => {
     saveUserProfile(user);
+    if (user.id) {
+      saveUserProfileToFirestore(user);
+    }
   }, [user]);
 
   useEffect(() => {
     saveThemeSettings(theme);
     audioHaptics.setPreferences(theme.soundEnabled, theme.hapticsEnabled);
+
+    // Apply global Tailwind CSS class & data-theme attribute
+    const root = document.documentElement;
+    root.classList.remove('theme-midnight', 'theme-cyber');
+    if (theme.palette === 'cyber' || theme.mode === 'cyber') {
+      root.classList.add('theme-cyber');
+      root.setAttribute('data-theme', 'cyber');
+    } else {
+      root.classList.add('theme-midnight');
+      root.setAttribute('data-theme', 'midnight');
+    }
   }, [theme]);
+
+  // Handle Daily Lucky Wheel Reward Claim (Atomically adds Brain Score, Coins, Diamonds & XP)
+  const handleClaimWheelReward = (rewards: { coins?: number; brainScore?: number; diamonds?: number; xp?: number }) => {
+    audioHaptics.playCorrect();
+    audioHaptics.triggerHaptic('success');
+
+    setUser(prevUser => {
+      const addedCoins = rewards.coins || 0;
+      const addedBrain = rewards.brainScore || 0;
+      const addedDiamonds = rewards.diamonds || 0;
+      const addedXP = rewards.xp || 0;
+
+      const newXP = (prevUser.xp || 0) + addedXP;
+      const newLevel = Math.floor(newXP / 300) + 1;
+
+      return {
+        ...prevUser,
+        coins: (prevUser.coins || 0) + addedCoins,
+        brainScore: (prevUser.brainScore || 0) + addedBrain,
+        diamonds: (prevUser.diamonds || 0) + addedDiamonds,
+        xp: newXP,
+        level: newLevel,
+      };
+    });
+
+    if (user.id) {
+      addWheelRewardsInFirestore(user.id, rewards);
+    }
+  };
 
   useEffect(() => {
     saveDailyMissions(missions);
@@ -91,21 +191,15 @@ export default function App() {
     setActiveTab('game_active');
   };
 
-  // Handle Game Completion Result
+  // Handle Game Completion Result with Functional State Update (Fixes Coins Not Adding Up)
   const handleGameFinish = (score: number, accuracy: number, reactionTimeMs: number) => {
     audioHaptics.playFanfare();
     audioHaptics.triggerHaptic('levelUp');
     confetti({ particleCount: 60, spread: 70, origin: { y: 0.6 } });
 
-    const xpGained = Math.round(score / 2);
-    const coinsGained = Math.round(score / 10);
-    const newXP = user.xp + xpGained;
-    const newLevel = Math.floor(newXP / 300) + 1;
-    const levelUpOccurred = newLevel > user.level;
+    const xpGained = Math.max(20, Math.round(score / 2));
+    const coinsGained = Math.max(15, Math.round(score / 10));
 
-    const newBrainScore = user.brainScore + Math.round(score / 20);
-
-    // Update Skill Category Ratings
     const categoryRatingKey: keyof UserProfile['ratings'] = 
       activeGameId === 'memory_matrix' || activeGameId === 'color_shape_memory' ? 'memory'
       : activeGameId === 'mental_math' ? 'math'
@@ -114,27 +208,31 @@ export default function App() {
       : activeGameId === 'sudoku' || activeGameId === 'maze_escape' ? 'focus'
       : 'logic';
 
-    const currentRating = user.ratings[categoryRatingKey];
-    const newRating = Math.min(2000, currentRating + Math.round(score / 30));
+    // Functional State Update to guarantee coins and XP add up correctly without stale closures
+    setUser(prevUser => {
+      const newXP = (prevUser.xp || 0) + xpGained;
+      const newLevel = Math.floor(newXP / 300) + 1;
+      const newBrainScore = (prevUser.brainScore || 1000) + Math.round(score / 20);
+      const currentRating = prevUser.ratings[categoryRatingKey] || 1200;
+      const newRating = Math.min(2500, currentRating + Math.round(score / 30));
 
-    const updatedProfile: UserProfile = {
-      ...user,
-      xp: newXP,
-      level: newLevel,
-      coins: user.coins + coinsGained,
-      brainScore: newBrainScore,
-      ratings: {
-        ...user.ratings,
-        [categoryRatingKey]: newRating,
-      },
-    };
+      return {
+        ...prevUser,
+        xp: newXP,
+        level: newLevel,
+        coins: (prevUser.coins || 0) + coinsGained,
+        brainScore: newBrainScore,
+        ratings: {
+          ...prevUser.ratings,
+          [categoryRatingKey]: newRating,
+        },
+      };
+    });
 
-    setUser(updatedProfile);
-
-    // Save Session Record
+    // Save Session Record to Local & Real-time Firestore
     const sessionRecord: GameSessionResult = {
       gameId: activeGameId || 'memory_matrix',
-      gameName: activeGameId ? activeGameId.toUpperCase().replace('_', ' ') : 'MINI GAME',
+      gameName: activeGameId ? activeGameId.toUpperCase().replace(/_/g, ' ') : 'MINI GAME',
       score,
       accuracy,
       reactionTimeMs,
@@ -147,29 +245,68 @@ export default function App() {
     saveGameSession(sessionRecord);
     setSessions(prev => [sessionRecord, ...prev]);
 
+    // Firestore atomic session and coin logger
+    if (user.id) {
+      logGameSessionToFirestore(user.id, user.name, sessionRecord);
+    }
+
+    // Evaluate Achievements & Trigger Toast Notification
+    const { updatedAchievements, newlyUnlocked, bonusXP, bonusCoins } = evaluateAchievements(
+      achievements,
+      sessionRecord,
+      user
+    );
+
+    setAchievements(updatedAchievements);
+
+    if (newlyUnlocked.length > 0) {
+      setUnlockedToastAchievement(newlyUnlocked[0]);
+
+      if (bonusXP > 0 || bonusCoins > 0) {
+        setUser(prev => ({
+          ...prev,
+          xp: (prev.xp || 0) + bonusXP,
+          coins: (prev.coins || 0) + bonusCoins,
+        }));
+      }
+    }
+
     // Return to dashboard
     setActiveGameId(null);
     setActiveTab('dashboard');
   };
 
+  // Claim Mission with Functional State Update
   const handleClaimMission = (missionId: string) => {
     audioHaptics.playCorrect();
     audioHaptics.triggerHaptic('success');
-    confetti({ particleCount: 30 });
+    confetti({ particleCount: 35 });
 
-    const updatedMissions = missions.map(m => {
-      if (m.id === missionId) {
-        setUser(prev => ({
-          ...prev,
-          xp: prev.xp + m.rewardXP,
-          coins: prev.coins + m.rewardCoins,
-        }));
-        return { ...m, claimed: true, completed: true };
+    const targetMission = missions.find(m => m.id === missionId);
+    if (targetMission && !targetMission.claimed) {
+      const rewardCoins = targetMission.rewardCoins || 50;
+      const rewardXP = targetMission.rewardXP || 100;
+
+      setUser(prev => ({
+        ...prev,
+        xp: (prev.xp || 0) + rewardXP,
+        coins: (prev.coins || 0) + rewardCoins,
+      }));
+
+      if (user.id) {
+        addCoinsInFirestore(user.id, rewardCoins);
       }
-      return m;
-    });
 
-    setMissions(updatedMissions);
+      setMissions(prev => prev.map(m => m.id === missionId ? { ...m, claimed: true, completed: true } : m));
+    }
+  };
+
+  const handleUpdateCoins = (amount: number) => {
+    audioHaptics.playCorrect();
+    setUser(prev => ({ ...prev, coins: (prev.coins || 0) + amount }));
+    if (user.id) {
+      addCoinsInFirestore(user.id, amount);
+    }
   };
 
   const handleCompleteOnboarding = (updated: Partial<UserProfile>) => {
@@ -190,6 +327,14 @@ export default function App() {
         <OnboardingModal user={user} onComplete={handleCompleteOnboarding} />
       )}
 
+      {/* Auth Modal (Register & Login) */}
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        currentUser={user}
+        onAuthSuccess={(newProfile) => setUser(newProfile)}
+      />
+
       {/* Main Top Header Navbar */}
       <Navbar
         activeTab={activeTab}
@@ -199,6 +344,7 @@ export default function App() {
         setTheme={setTheme}
         onOpenSettings={() => setShowSettings(true)}
         onOpenAdmin={() => setShowAdminModal(true)}
+        onOpenAuth={() => setShowAuthModal(true)}
       />
 
       {/* Main View Area */}
@@ -211,6 +357,7 @@ export default function App() {
             onSelectGame={handleSelectGame}
             onNavigateTab={setActiveTab}
             onClaimMission={handleClaimMission}
+            onUpdateUser={handleUpdateUser}
           />
         )}
 
@@ -236,7 +383,9 @@ export default function App() {
             missions={missions}
             achievements={achievements}
             onClaimMission={handleClaimMission}
-            onUpdateCoins={(amt) => setUser(prev => ({ ...prev, coins: prev.coins + amt }))}
+            onUpdateCoins={handleUpdateCoins}
+            onClaimWheelReward={handleClaimWheelReward}
+            onTestTriggerToast={(ach) => setUnlockedToastAchievement(ach)}
           />
         )}
 
@@ -306,6 +455,12 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* Achievement Unlocked Toast Notification System */}
+      <AchievementToast
+        achievement={unlockedToastAchievement}
+        onClose={() => setUnlockedToastAchievement(null)}
+      />
 
     </div>
   );

@@ -17,7 +17,8 @@ import {
   Sun,
   Volume2,
   VolumeX,
-  Smartphone
+  User,
+  UserPlus
 } from 'lucide-react';
 import { UserProfile, ThemeSettings } from '../types';
 import { audioHaptics } from '../utils/audioHaptics';
@@ -30,6 +31,7 @@ interface NavbarProps {
   setTheme: React.Dispatch<React.SetStateAction<ThemeSettings>>;
   onOpenSettings: () => void;
   onOpenAdmin: () => void;
+  onOpenAuth: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -40,6 +42,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   setTheme,
   onOpenSettings,
   onOpenAdmin,
+  onOpenAuth,
 }) => {
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Brain },
@@ -57,10 +60,18 @@ export const Navbar: React.FC<NavbarProps> = ({
     setActiveTab(id);
   };
 
-  const toggleMode = () => {
+  const toggleThemePalette = () => {
     audioHaptics.playClick();
     audioHaptics.triggerHaptic('tap');
-    setTheme(prev => ({ ...prev, mode: prev.mode === 'dark' ? 'light' : 'dark' }));
+    setTheme(prev => {
+      const isCyber = prev.palette === 'cyber' || prev.mode === 'cyber';
+      const nextTheme = isCyber ? 'midnight' : 'cyber';
+      return {
+        ...prev,
+        mode: nextTheme,
+        palette: nextTheme,
+      };
+    });
   };
 
   const toggleSound = () => {
@@ -163,34 +174,47 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
 
             <button
-              onClick={toggleMode}
-              className="p-2 rounded-xl bg-[#0A0A0C] border border-[#1A1A1A] text-[#888888] hover:text-purple-400 hover:border-purple-500/30 transition-all"
-              title="Toggle Theme"
+              onClick={toggleThemePalette}
+              className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl bg-[#0A0A0C] border border-[#1A1A1A] text-xs font-bold hover:border-cyan-500/40 transition-all"
+              title="Toggle Theme (Midnight / Cyber)"
             >
-              {theme.mode === 'dark' ? <Moon className="w-4 h-4 text-purple-300" /> : <Sun className="w-4 h-4 text-amber-400" />}
+              {theme.palette === 'cyber' || theme.mode === 'cyber' ? (
+                <>
+                  <Zap className="w-4 h-4 text-pink-400" />
+                  <span className="hidden md:inline text-pink-400">Cyber</span>
+                </>
+              ) : (
+                <>
+                  <Moon className="w-4 h-4 text-cyan-400" />
+                  <span className="hidden md:inline text-cyan-400">Midnight</span>
+                </>
+              )}
             </button>
 
+            {/* Auth / Register Account Button */}
             <button
-              onClick={onOpenSettings}
-              className="p-2 rounded-xl bg-[#0A0A0C] border border-[#1A1A1A] text-[#888888] hover:text-[#FFFFFF] hover:border-[#333333] transition-all"
-              title="Settings & Accessibility"
+              onClick={onOpenAuth}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#00F5FF]/20 to-purple-600/20 border border-[#00F5FF]/40 text-[#00F5FF] hover:border-[#00F5FF] hover:bg-[#00F5FF]/30 transition text-xs font-bold shadow-[0_0_12px_rgba(0,245,255,0.15)]"
+              title={user.email ? `Logged in as ${user.email}` : 'Register / Login Account'}
             >
-              <Settings className="w-4 h-4" />
-            </button>
-
-            {/* Admin Portal Button */}
-            <button
-              onClick={onOpenAdmin}
-              className="p-2 rounded-xl bg-[#0A0A0C] border border-amber-500/30 text-amber-400 hover:bg-amber-500/10 transition-all"
-              title="Admin Panel"
-            >
-              <ShieldAlert className="w-4 h-4" />
+              {user.email ? (
+                <>
+                  <UserCheck className="w-4 h-4 text-emerald-400" />
+                  <span className="hidden sm:inline max-w-[90px] truncate">{user.name.split(' ')[0]}</span>
+                </>
+              ) : (
+                <>
+                  <UserPlus className="w-4 h-4" />
+                  <span className="hidden sm:inline">Register / Login</span>
+                </>
+              )}
             </button>
 
             {/* User Avatar */}
             <div 
               onClick={() => handleTabChange('dashboard')}
               className="flex items-center gap-2 pl-1 cursor-pointer group"
+              title={`${user.name} (${user.email || 'Guest Player'})`}
             >
               <div className="w-9 h-9 rounded-xl bg-[#00F5FF]/20 p-0.5 border border-[#00F5FF]/40 group-hover:border-[#00F5FF] transition shadow-[0_0_10px_rgba(0,245,255,0.2)]">
                 <div className="w-full h-full rounded-[10px] bg-[#050505] flex items-center justify-center text-lg font-bold">

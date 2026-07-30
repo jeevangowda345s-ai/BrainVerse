@@ -1,0 +1,25 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // User profile document
+    match /users/{userId} {
+      allow read, write: if true;
+    }
+
+    // Game Sessions history
+    match /gameSessions/{sessionId} {
+      allow read, write: if true;
+    }
+
+    // Real-time Multiplayer Rooms
+    match /multiplayerRooms/{roomId} {
+      allow read, write: if true;
+    }
+
+    // Live Activity Feed
+    match /activityFeed/{activityId} {
+      allow read, write: if true;
+    }
+  }
+}

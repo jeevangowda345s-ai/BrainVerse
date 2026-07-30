@@ -38,6 +38,7 @@ export interface UserProfile {
   id: string;
   name: string;
   username: string;
+  email?: string;
   avatar: string;
   avatarFrame: string;
   title: string;
@@ -61,6 +62,7 @@ export interface UserProfile {
   unlockedCosmetics: string[];
   isPremium: boolean;
   isOnboarded: boolean;
+  lastWheelSpinDate?: string;
   aiRoadmap?: AIRoadmap;
 }
 
@@ -115,8 +117,8 @@ export interface Achievement {
 }
 
 export interface ThemeSettings {
-  mode: 'dark' | 'light';
-  palette: 'neon_cyan' | 'purple_glow' | 'emerald_matrix' | 'deep_blue' | 'minimal_light';
+  mode: 'midnight' | 'cyber' | 'dark' | 'light';
+  palette: 'midnight' | 'cyber' | 'neon_cyan' | 'purple_glow' | 'emerald_matrix' | 'deep_blue' | 'minimal_light';
   hapticsEnabled: boolean;
   soundEnabled: boolean;
   fontSize: 'normal' | 'large' | 'xlarge';

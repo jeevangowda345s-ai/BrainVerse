@@ -23,6 +23,8 @@ class AudioHapticsEngine {
     }
   }
 
+  private lastHapticTime: number = 0;
+
   public setPreferences(sound: boolean, haptics: boolean) {
     this.soundEnabled = sound;
     this.hapticsEnabled = haptics;
@@ -32,24 +34,35 @@ class AudioHapticsEngine {
   public triggerHaptic(pattern: 'tap' | 'success' | 'error' | 'levelUp' | 'heavy') {
     if (!this.hapticsEnabled) return;
 
+    const now = Date.now();
+    // Throttle non-tap haptics to prevent device vibration overload/looping
+    if (now - this.lastHapticTime < 150 && pattern !== 'tap') {
+      return;
+    }
+    this.lastHapticTime = now;
+
     // Trigger device vibration if available
     if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
       try {
+        // Cancel any lingering vibrations first to prevent stuck vibration loops
+        navigator.vibrate(0);
+
         switch (pattern) {
           case 'tap':
-            navigator.vibrate(12);
+            navigator.vibrate(8);
             break;
           case 'success':
-            navigator.vibrate([15, 30, 25]);
+            navigator.vibrate([12, 25, 15]);
             break;
           case 'error':
-            navigator.vibrate([40, 40, 40]);
+            navigator.vibrate(30);
             break;
           case 'levelUp':
-            navigator.vibrate([30, 50, 40, 50, 60]);
+            // Official celebration pulse: clean, non-intrusive double pulse
+            navigator.vibrate([20, 30, 25]);
             break;
           case 'heavy':
-            navigator.vibrate(50);
+            navigator.vibrate(25);
             break;
         }
       } catch (e) {
@@ -59,6 +72,14 @@ class AudioHapticsEngine {
 
     // Trigger screen subtle tactile ripple effect
     this.triggerVisualHapticEffect(pattern);
+  }
+
+  public stopHaptics() {
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+      try {
+        navigator.vibrate(0);
+      } catch (e) {}
+    }
   }
 
   private triggerVisualHapticEffect(pattern: string) {
@@ -187,6 +208,36 @@ class AudioHapticsEngine {
 
       osc.start(now);
       osc.stop(now + 0.08);
+    } catch (e) {}
+  }
+
+  public playAchievementUnlock() {
+    if (!this.soundEnabled) return;
+    this.initCtx();
+    if (!this.ctx) return;
+
+    try {
+      const now = this.ctx.currentTime;
+      // Vibrant ascending fan-faric arpeggio with high chime finish
+      const frequencies = [523.25, 659.25, 783.99, 1046.5, 1318.5, 1567.98]; // C5, E5, G5, C6, E6, G6
+
+      frequencies.forEach((freq, idx) => {
+        const osc = this.ctx!.createOscillator();
+        const gain = this.ctx!.createGain();
+
+        osc.type = idx === frequencies.length - 1 ? 'sine' : 'triangle';
+        osc.frequency.setValueAtTime(freq, now + idx * 0.08);
+
+        gain.gain.setValueAtTime(0, now + idx * 0.08);
+        gain.gain.linearRampToValueAtTime(0.25, now + idx * 0.08 + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.08 + 0.35);
+
+        osc.connect(gain);
+        gain.connect(this.ctx!.destination);
+
+        osc.start(now + idx * 0.08);
+        osc.stop(now + idx * 0.08 + 0.35);
+      });
     } catch (e) {}
   }
 

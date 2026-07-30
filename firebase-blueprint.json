@@ -1,0 +1,72 @@
+{
+  "entities": {
+    "users": {
+      "title": "User Profile",
+      "description": "User profile data, stats, coins, and settings",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "username": { "type": "string" },
+        "email": { "type": "string" },
+        "avatar": { "type": "string" },
+        "level": { "type": "integer" },
+        "xp": { "type": "integer" },
+        "coins": { "type": "integer" },
+        "brainScore": { "type": "integer" },
+        "streak": { "type": "integer" },
+        "ratings": { "type": "object" },
+        "badges": { "type": "array" },
+        "unlockedCosmetics": { "type": "array" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "name", "coins", "brainScore"]
+    },
+    "gameSessions": {
+      "title": "Game Session Result",
+      "description": "Completed mini-game session results for stats and history",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "gameId": { "type": "string" },
+        "gameName": { "type": "string" },
+        "score": { "type": "integer" },
+        "accuracy": { "type": "number" },
+        "reactionTimeMs": { "type": "integer" },
+        "xpEarned": { "type": "integer" },
+        "coinsEarned": { "type": "integer" },
+        "timestamp": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["userId", "gameId", "score"]
+    },
+    "multiplayerRooms": {
+      "title": "Multiplayer Game Room",
+      "description": "Real-time duel/versus rooms for live brain battles",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "roomCode": { "type": "string" },
+        "hostId": { "type": "string" },
+        "hostName": { "type": "string" },
+        "hostAvatar": { "type": "string" },
+        "guestId": { "type": "string" },
+        "guestName": { "type": "string" },
+        "guestAvatar": { "type": "string" },
+        "gameType": { "type": "string" },
+        "status": { "type": "string" },
+        "hostScore": { "type": "integer" },
+        "guestScore": { "type": "integer" },
+        "hostReady": { "type": "boolean" },
+        "guestReady": { "type": "boolean" },
+        "winnerId": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["roomCode", "hostId", "gameType", "status"]
+    }
+  }
+}
