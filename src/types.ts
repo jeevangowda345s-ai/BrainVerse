@@ -118,7 +118,7 @@ export interface Achievement {
 
 export interface ThemeSettings {
   mode: 'midnight' | 'cyber' | 'dark' | 'light';
-  palette: 'midnight' | 'cyber' | 'neon_cyan' | 'purple_glow' | 'emerald_matrix' | 'deep_blue' | 'minimal_light';
+  palette: 'midnight' | 'cyber' | 'emerald_matrix' | 'deep_amethyst' | 'solarized_ocean' | 'minimal_light' | 'sunset_ember';
   hapticsEnabled: boolean;
   soundEnabled: boolean;
   fontSize: 'normal' | 'large' | 'xlarge';

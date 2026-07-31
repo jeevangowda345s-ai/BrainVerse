@@ -56,6 +56,7 @@ import { audioHaptics } from './utils/audioHaptics';
 import { processDailyStreak } from './utils/streak';
 import { evaluateAchievements } from './utils/achievementChecker';
 import { AchievementToast } from './components/AchievementToast';
+import { getThemeConfig } from './utils/theme';
 
 // Firebase Real-time Imports
 import { auth, onAuthStateChanged, signInAnonymously } from './lib/firebase';
@@ -354,8 +355,10 @@ export default function App() {
     );
   }
 
+  const themeConfig = getThemeConfig(theme.palette);
+
   return (
-    <div className="min-h-screen font-sans bg-[#050505] text-[#E0E0E0] bg-grid-pattern transition-colors duration-300">
+    <div className={`min-h-screen font-sans ${themeConfig.bgClass} bg-grid-pattern transition-colors duration-300`}>
       
       {/* First-Time Onboarding Popup */}
       {!user.isOnboarded && (

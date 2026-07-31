@@ -2,7 +2,8 @@ import {
   db, 
   auth, 
   doc, 
-  getDoc, 
+  getDoc,
+  getDocs, 
   setDoc, 
   updateDoc, 
   collection, 
@@ -44,6 +45,7 @@ export interface RealtimeRoomData {
   guestReady?: boolean;
   status: 'Waiting' | 'In Progress' | 'Finished';
   winnerId?: string;
+  winnerName?: string;
   stakes: number;
   createdAt: any;
 }
@@ -243,12 +245,32 @@ export function subscribeToMultiplayerRooms(onUpdate: (rooms: RealtimeRoomData[]
   });
 }
 
+// Subscribe to a single Multiplayer Room real-time
+export function subscribeToRoom(roomId: string, onUpdate: (room: RealtimeRoomData | null) => void) {
+  if (!roomId) return () => {};
+  const roomRef = doc(db, 'multiplayerRooms', roomId);
+
+  return onSnapshot(roomRef, (docSnap) => {
+    if (docSnap.exists()) {
+      onUpdate({
+        id: docSnap.id,
+        ...docSnap.data(),
+      } as RealtimeRoomData);
+    } else {
+      onUpdate(null);
+    }
+  }, (err) => {
+    console.warn('Single room subscription error:', err);
+  });
+}
+
 // Create real-time multiplayer duel room
 export async function createRealtimeRoom(
   user: UserProfile, 
   gameTitle: string, 
-  stakes: number = 50
-): Promise<string> {
+  stakes: number = 50,
+  targetUserId?: string
+): Promise<{ roomId: string; roomCode: string }> {
   const roomCode = Math.floor(100000 + Math.random() * 900000).toString();
   const docRef = await addDoc(collection(db, 'multiplayerRooms'), {
     roomCode,
@@ -258,11 +280,12 @@ export async function createRealtimeRoom(
     hostAvatar: user.avatar,
     hostScore: 0,
     hostReady: true,
+    targetUserId: targetUserId || null,
     status: 'Waiting',
     stakes,
     createdAt: serverTimestamp(),
   });
-  return docRef.id;
+  return { roomId: docRef.id, roomCode };
 }
 
 // Join real-time room
@@ -278,6 +301,33 @@ export async function joinRealtimeRoom(roomId: string, user: UserProfile): Promi
   });
 }
 
+// Join room by 6-digit code
+export async function joinRoomByCode(roomCode: string, user: UserProfile): Promise<RealtimeRoomData | null> {
+  if (!roomCode || roomCode.trim().length < 4) return null;
+  try {
+    const roomsRef = collection(db, 'multiplayerRooms');
+    const q = query(roomsRef, where('roomCode', '==', roomCode.trim()), limit(1));
+    const querySnap = await getDocs(q);
+    
+    if (!querySnap.empty) {
+      const roomDoc = querySnap.docs[0];
+      const roomId = roomDoc.id;
+      await joinRealtimeRoom(roomId, user);
+      return {
+        id: roomId,
+        ...roomDoc.data(),
+        status: 'In Progress',
+        guestId: user.id,
+        guestName: user.name,
+        guestAvatar: user.avatar
+      } as RealtimeRoomData;
+    }
+  } catch (err) {
+    console.error('Error joining room by code:', err);
+  }
+  return null;
+}
+
 // Update live score during multiplayer game
 export async function updateMultiplayerScore(
   roomId: string, 
@@ -290,4 +340,18 @@ export async function updateMultiplayerScore(
   } else {
     await updateDoc(roomRef, { guestScore: score });
   }
+}
+
+// Mark match finished
+export async function finishMultiplayerMatch(
+  roomId: string,
+  winnerId: string,
+  winnerName?: string
+): Promise<void> {
+  const roomRef = doc(db, 'multiplayerRooms', roomId);
+  await updateDoc(roomRef, {
+    status: 'Finished',
+    winnerId,
+    winnerName: winnerName || null,
+  });
 }

@@ -17,7 +17,8 @@ import {
   Gamepad2, 
   ArrowRight,
   Shield,
-  Activity
+  Activity,
+  KeyRound
 } from 'lucide-react';
 import { 
   auth, 
@@ -25,6 +26,7 @@ import {
   signInWithPopup, 
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword, 
+  sendPasswordResetEmail,
   signInAnonymously 
 } from '../lib/firebase';
 import { UserProfile } from '../types';
@@ -40,7 +42,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
   currentUser,
   onAuthSuccess
 }) => {
-  const [tab, setTab] = useState<'register' | 'signin'>('register');
+  const [tab, setTab] = useState<'register' | 'signin' | 'forgot'>('register');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -48,6 +50,40 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setSuccessMsg(null);
+
+    if (!email.trim()) {
+      setError('Please enter your email address to receive a password reset link.');
+      return;
+    }
+
+    setLoading(true);
+    audioHaptics.playClick();
+
+    try {
+      await sendPasswordResetEmail(auth, email.trim());
+      setSuccessMsg(`Password reset email sent to ${email.trim()}. Please check your inbox or spam folder.`);
+      audioHaptics.playFanfare();
+    } catch (err: any) {
+      console.error('Password reset error:', err);
+      let msg = 'Failed to send password reset email.';
+      if (err?.code === 'auth/user-not-found') {
+        msg = 'No registered user account found with this email address.';
+      } else if (err?.code === 'auth/invalid-email') {
+        msg = 'Please enter a valid email address.';
+      } else if (err?.message) {
+        msg = err.message;
+      }
+      setError(msg);
+      audioHaptics.triggerHaptic('error');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,6 +113,10 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
           name: name.trim(),
           username: username.trim() || name.toLowerCase().replace(/\s+/g, '_'),
           email: firebaseUser.email || email.trim(),
+          level: 1,
+          xp: 0,
+          brainScore: 100,
+          rank: 'Apprentice Mind',
           isOnboarded: true,
         };
 
@@ -171,6 +211,10 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         username: (gUser.email ? gUser.email.split('@')[0] : 'user') + '_' + Math.floor(Math.random() * 1000),
         email: gUser.email || '',
         avatar: gUser.photoURL || currentUser.avatar || '🧠',
+        level: 1,
+        xp: 0,
+        brainScore: 100,
+        rank: 'Apprentice Mind',
         isOnboarded: true,
       };
 
@@ -210,7 +254,11 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
       const profile: UserProfile = {
         ...currentUser,
         id: uid,
-        name: currentUser.name && !currentUser.name.startsWith('Neural Explorer') ? currentUser.name : 'Guest Explorer #' + Math.floor(Math.random() * 900 + 100),
+        name: currentUser.name && !currentUser.name.startsWith('Neural Explorer') ? currentUser.name : 'Guest Player #' + Math.floor(Math.random() * 900 + 100),
+        level: 1,
+        xp: 0,
+        brainScore: 100,
+        rank: 'Apprentice Mind',
       };
       await saveUserProfileToFirestore(profile);
       onAuthSuccess(profile);
@@ -329,43 +377,48 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
             {/* Header / Switch Tabs */}
             <div className="space-y-4">
               <div className="text-center space-y-1">
-                <h2 className="text-2xl font-black text-white tracking-tight">
-                  {tab === 'register' ? 'Create Your Account' : 'Welcome Back'}
+                <h2 className="text-2xl font-black text-white tracking-tight flex items-center justify-center gap-2">
+                  {tab === 'forgot' && <KeyRound className="w-6 h-6 text-[#00F5FF]" />}
+                  {tab === 'register' ? 'Create Your Account' : tab === 'signin' ? 'Welcome Back' : 'Reset Password'}
                 </h2>
                 <p className="text-xs text-slate-400">
                   {tab === 'register' 
                     ? 'Register to save your brain scores, coins, and live rank.' 
-                    : 'Sign in to resume your cognitive training sessions.'}
+                    : tab === 'signin'
+                    ? 'Sign in to resume your cognitive training sessions.'
+                    : 'Enter your registered email address to receive a password reset link.'}
                 </p>
               </div>
 
               {/* Tab Selector */}
-              <div className="grid grid-cols-2 gap-2 p-1.5 rounded-2xl bg-[#050508] border border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => { setTab('register'); setError(null); }}
-                  className={`py-2.5 text-xs font-black rounded-xl transition flex items-center justify-center gap-2 ${
-                    tab === 'register' 
-                      ? 'bg-gradient-to-r from-[#00F5FF] to-blue-600 text-slate-950 shadow-md shadow-[#00F5FF]/20' 
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  <UserPlus className="w-4 h-4" />
-                  Register
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setTab('signin'); setError(null); }}
-                  className={`py-2.5 text-xs font-black rounded-xl transition flex items-center justify-center gap-2 ${
-                    tab === 'signin' 
-                      ? 'bg-gradient-to-r from-[#00F5FF] to-blue-600 text-slate-950 shadow-md shadow-[#00F5FF]/20' 
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  <LogIn className="w-4 h-4" />
-                  Sign In
-                </button>
-              </div>
+              {tab !== 'forgot' && (
+                <div className="grid grid-cols-2 gap-2 p-1.5 rounded-2xl bg-[#050508] border border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => { setTab('register'); setError(null); setSuccessMsg(null); }}
+                    className={`py-2.5 text-xs font-black rounded-xl transition flex items-center justify-center gap-2 ${
+                      tab === 'register' 
+                        ? 'bg-gradient-to-r from-[#00F5FF] to-blue-600 text-slate-950 shadow-md shadow-[#00F5FF]/20' 
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <UserPlus className="w-4 h-4" />
+                    Register
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setTab('signin'); setError(null); setSuccessMsg(null); }}
+                    className={`py-2.5 text-xs font-black rounded-xl transition flex items-center justify-center gap-2 ${
+                      tab === 'signin' 
+                        ? 'bg-gradient-to-r from-[#00F5FF] to-blue-600 text-slate-950 shadow-md shadow-[#00F5FF]/20' 
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <LogIn className="w-4 h-4" />
+                    Sign In
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Error / Success Notifications */}
@@ -383,126 +436,176 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               </div>
             )}
 
-            {/* Google 1-Click Sign-In */}
-            <button
-              type="button"
-              onClick={handleGoogleSignIn}
-              disabled={loading}
-              className="w-full py-3 px-4 rounded-2xl bg-[#050508] hover:bg-slate-900 border border-slate-700 text-white font-bold text-xs flex items-center justify-center gap-3 transition shadow-md disabled:opacity-50 group"
-            >
-              <svg className="w-4 h-4 group-hover:scale-110 transition" viewBox="0 0 24 24">
-                <path
-                  fill="#4285F4"
-                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-                />
-                <path
-                  fill="#EA4335"
-                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-                />
-              </svg>
-              Continue with Google
-            </button>
-
-            <div className="relative flex items-center justify-center">
-              <div className="border-t border-slate-800 w-full" />
-              <span className="bg-[#0A0A12] px-3 text-[10px] uppercase font-extrabold text-slate-500 tracking-wider">
-                or email
-              </span>
-            </div>
-
-            {/* Email & Password Form */}
-            <form onSubmit={handleEmailAuth} className="space-y-3.5">
-              {tab === 'register' && (
-                <>
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-300 mb-1">Full Name</label>
-                    <div className="relative">
-                      <User className="absolute left-3.5 top-3 w-4 h-4 text-slate-500" />
-                      <input
-                        type="text"
-                        required
-                        placeholder="e.g. Alex Mercer"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2.5 bg-[#050508] border border-slate-800 rounded-xl text-xs text-white placeholder-slate-600 focus:outline-none focus:border-[#00F5FF] transition"
-                      />
-                    </div>
+            {tab === 'forgot' ? (
+              /* Forgot Password Form */
+              <form onSubmit={handleForgotPassword} className="space-y-4">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-300 mb-1">Email Address</label>
+                  <div className="relative">
+                    <Mail className="absolute left-3.5 top-3 w-4 h-4 text-slate-500" />
+                    <input
+                      type="email"
+                      required
+                      placeholder="you@example.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2.5 bg-[#050508] border border-slate-800 rounded-xl text-xs text-white placeholder-slate-600 focus:outline-none focus:border-[#00F5FF] transition"
+                    />
                   </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-300 mb-1">Username (Optional)</label>
-                    <div className="relative">
-                      <Globe className="absolute left-3.5 top-3 w-4 h-4 text-slate-500" />
-                      <input
-                        type="text"
-                        placeholder="e.g. alex_mindforge"
-                        value={username}
-                        onChange={(e) => setUsername(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2.5 bg-[#050508] border border-slate-800 rounded-xl text-xs text-white placeholder-slate-600 focus:outline-none focus:border-[#00F5FF] transition"
-                      />
-                    </div>
-                  </div>
-                </>
-              )}
-
-              <div>
-                <label className="block text-[11px] font-bold text-slate-300 mb-1">Email Address</label>
-                <div className="relative">
-                  <Mail className="absolute left-3.5 top-3 w-4 h-4 text-slate-500" />
-                  <input
-                    type="email"
-                    required
-                    placeholder="you@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 bg-[#050508] border border-slate-800 rounded-xl text-xs text-white placeholder-slate-600 focus:outline-none focus:border-[#00F5FF] transition"
-                  />
                 </div>
-              </div>
 
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-[11px] font-bold text-slate-300">Password</label>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-[#00F5FF] via-blue-500 to-purple-600 text-slate-950 font-black text-xs uppercase tracking-wider hover:opacity-95 transition shadow-lg shadow-[#00F5FF]/20 disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  <span>{loading ? 'Sending Reset Link...' : 'Send Password Reset Link'}</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+
+                <div className="text-center pt-2">
+                  <button
+                    type="button"
+                    onClick={() => { setTab('signin'); setError(null); setSuccessMsg(null); }}
+                    className="text-xs font-bold text-slate-400 hover:text-white transition"
+                  >
+                    ← Back to Sign In
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <>
+                {/* Google 1-Click Sign-In */}
+                <button
+                  type="button"
+                  onClick={handleGoogleSignIn}
+                  disabled={loading}
+                  className="w-full py-3 px-4 rounded-2xl bg-[#050508] hover:bg-slate-900 border border-slate-700 text-white font-bold text-xs flex items-center justify-center gap-3 transition shadow-md disabled:opacity-50 group"
+                >
+                  <svg className="w-4 h-4 group-hover:scale-110 transition" viewBox="0 0 24 24">
+                    <path
+                      fill="#4285F4"
+                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                    />
+                    <path
+                      fill="#34A853"
+                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                    />
+                    <path
+                      fill="#FBBC05"
+                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                    />
+                    <path
+                      fill="#EA4335"
+                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                    />
+                  </svg>
+                  Continue with Google
+                </button>
+
+                <div className="relative flex items-center justify-center">
+                  <div className="border-t border-slate-800 w-full" />
+                  <span className="bg-[#0A0A12] px-3 text-[10px] uppercase font-extrabold text-slate-500 tracking-wider">
+                    or email
+                  </span>
+                </div>
+
+                {/* Email & Password Form */}
+                <form onSubmit={handleEmailAuth} className="space-y-3.5">
                   {tab === 'register' && (
-                    <span className={`text-[10px] font-mono ${password.length > 0 && password.length < 6 ? 'text-amber-400 font-bold' : 'text-slate-500'}`}>
-                      Min. 6 chars
-                    </span>
-                  )}
-                </div>
-                <div className="relative">
-                  <Lock className="absolute left-3.5 top-3 w-4 h-4 text-slate-500" />
-                  <input
-                    type="password"
-                    required
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className={`w-full pl-10 pr-4 py-2.5 bg-[#050508] border rounded-xl text-xs text-white placeholder-slate-600 focus:outline-none transition ${
-                      tab === 'register' && password.length > 0 && password.length < 6
-                        ? 'border-amber-500/70 focus:border-amber-400'
-                        : 'border-slate-800 focus:border-[#00F5FF]'
-                    }`}
-                  />
-                </div>
-              </div>
+                    <>
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-300 mb-1">Full Name</label>
+                        <div className="relative">
+                          <User className="absolute left-3.5 top-3 w-4 h-4 text-slate-500" />
+                          <input
+                            type="text"
+                            required
+                            placeholder="e.g. Alex Mercer"
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2.5 bg-[#050508] border border-slate-800 rounded-xl text-xs text-white placeholder-slate-600 focus:outline-none focus:border-[#00F5FF] transition"
+                          />
+                        </div>
+                      </div>
 
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-[#00F5FF] via-blue-500 to-purple-600 text-slate-950 font-black text-xs uppercase tracking-wider hover:opacity-95 transition shadow-lg shadow-[#00F5FF]/20 disabled:opacity-50 mt-2 flex items-center justify-center gap-2"
-              >
-                <span>{loading ? 'Processing...' : tab === 'register' ? 'Register & Start Training' : 'Sign In To Account'}</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
-            </form>
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-300 mb-1">Username (Optional)</label>
+                        <div className="relative">
+                          <Globe className="absolute left-3.5 top-3 w-4 h-4 text-slate-500" />
+                          <input
+                            type="text"
+                            placeholder="e.g. alex_mindforge"
+                            value={username}
+                            onChange={(e) => setUsername(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2.5 bg-[#050508] border border-slate-800 rounded-xl text-xs text-white placeholder-slate-600 focus:outline-none focus:border-[#00F5FF] transition"
+                          />
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-300 mb-1">Email Address</label>
+                    <div className="relative">
+                      <Mail className="absolute left-3.5 top-3 w-4 h-4 text-slate-500" />
+                      <input
+                        type="email"
+                        required
+                        placeholder="you@example.com"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2.5 bg-[#050508] border border-slate-800 rounded-xl text-xs text-white placeholder-slate-600 focus:outline-none focus:border-[#00F5FF] transition"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-[11px] font-bold text-slate-300">Password</label>
+                      {tab === 'signin' && (
+                        <button
+                          type="button"
+                          onClick={() => { setTab('forgot'); setError(null); setSuccessMsg(null); }}
+                          className="text-[11px] font-bold text-[#00F5FF] hover:underline transition"
+                        >
+                          Forgot Password?
+                        </button>
+                      )}
+                      {tab === 'register' && (
+                        <span className={`text-[10px] font-mono ${password.length > 0 && password.length < 6 ? 'text-amber-400 font-bold' : 'text-slate-500'}`}>
+                          Min. 6 chars
+                        </span>
+                      )}
+                    </div>
+                    <div className="relative">
+                      <Lock className="absolute left-3.5 top-3 w-4 h-4 text-slate-500" />
+                      <input
+                        type="password"
+                        required
+                        placeholder="••••••••"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className={`w-full pl-10 pr-4 py-2.5 bg-[#050508] border rounded-xl text-xs text-white placeholder-slate-600 focus:outline-none transition ${
+                          tab === 'register' && password.length > 0 && password.length < 6
+                            ? 'border-amber-500/70 focus:border-amber-400'
+                            : 'border-slate-800 focus:border-[#00F5FF]'
+                        }`}
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-[#00F5FF] via-blue-500 to-purple-600 text-slate-950 font-black text-xs uppercase tracking-wider hover:opacity-95 transition shadow-lg shadow-[#00F5FF]/20 disabled:opacity-50 mt-2 flex items-center justify-center gap-2"
+                  >
+                    <span>{loading ? 'Processing...' : tab === 'register' ? 'Register & Start Training' : 'Sign In To Account'}</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </form>
+              </>
+            )}
 
             {/* Instant Guest Mode Option */}
             <div className="pt-3 border-t border-slate-800/80 text-center">

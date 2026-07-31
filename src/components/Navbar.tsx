@@ -15,6 +15,7 @@ import {
   ShieldAlert,
   Moon,
   Sun,
+  Palette,
   Volume2,
   VolumeX,
   User,
@@ -63,16 +64,27 @@ export const Navbar: React.FC<NavbarProps> = ({
     setActiveTab(id);
   };
 
+  const themeCycle: Array<ThemeSettings['palette']> = [
+    'midnight',
+    'cyber',
+    'emerald_matrix',
+    'deep_amethyst',
+    'solarized_ocean',
+    'minimal_light',
+    'sunset_ember'
+  ];
+
   const toggleThemePalette = () => {
     audioHaptics.playClick();
     audioHaptics.triggerHaptic('tap');
     setTheme(prev => {
-      const isCyber = prev.palette === 'cyber' || prev.mode === 'cyber';
-      const nextTheme = isCyber ? 'midnight' : 'cyber';
+      const currentIdx = themeCycle.indexOf(prev.palette || 'midnight');
+      const nextIdx = (currentIdx + 1) % themeCycle.length;
+      const nextPalette = themeCycle[nextIdx];
       return {
         ...prev,
-        mode: nextTheme,
-        palette: nextTheme,
+        mode: nextPalette === 'minimal_light' ? 'light' : 'midnight',
+        palette: nextPalette,
       };
     });
   };
@@ -195,19 +207,22 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               onClick={toggleThemePalette}
               className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl bg-[#0A0A0C] border border-[#1A1A1A] text-xs font-bold hover:border-cyan-500/40 transition-all"
-              title="Toggle Theme (Midnight / Cyber)"
+              title="Click to cycle theme palette"
             >
-              {theme.palette === 'cyber' || theme.mode === 'cyber' ? (
-                <>
-                  <Zap className="w-4 h-4 text-pink-400" />
-                  <span className="hidden md:inline text-pink-400">Cyber</span>
-                </>
-              ) : (
-                <>
-                  <Moon className="w-4 h-4 text-cyan-400" />
-                  <span className="hidden md:inline text-cyan-400">Midnight</span>
-                </>
-              )}
+              <Palette className="w-4 h-4 text-purple-400" />
+              <span className="hidden md:inline capitalize text-slate-300">
+                {theme.palette ? theme.palette.replace('_', ' ') : 'Midnight'}
+              </span>
+            </button>
+
+            {/* Master Dev Authority / Admin Panel Button */}
+            <button
+              onClick={onOpenAdmin}
+              className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20 transition-all text-xs font-bold"
+              title="Developer Authority & Version Console"
+            >
+              <ShieldAlert className="w-4 h-4 text-amber-400" />
+              <span className="hidden lg:inline">Dev Console</span>
             </button>
 
             {/* Auth / Register Account Button */}

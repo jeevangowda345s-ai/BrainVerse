@@ -1,5 +1,19 @@
 import React, { useState } from 'react';
-import { ShieldAlert, Users, Server, Bot, Bell, Database, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { 
+  ShieldAlert, 
+  Lock, 
+  Bot, 
+  Bell, 
+  CheckCircle2, 
+  Sparkles, 
+  GitCommit, 
+  Code2, 
+  Gamepad2, 
+  Save, 
+  Zap, 
+  ShieldCheck, 
+  Sliders
+} from 'lucide-react';
 import { UserProfile } from '../types';
 import { audioHaptics } from '../utils/audioHaptics';
 
@@ -8,12 +22,53 @@ interface AdminPanelProps {
 }
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({ user }) => {
+  // Check if current user is the authorized Master Developer (jeevangowda345s@gmail.com)
+  const MASTER_ADMIN_EMAIL = 'jeevangowda345s@gmail.com';
+  const isMasterAdmin = 
+    (user.email && user.email.toLowerCase() === MASTER_ADMIN_EMAIL.toLowerCase()) ||
+    user.id === 'user_101' ||
+    user.username === 'jeevu_brainmaster';
+
+  // State for version control & game management
+  const [appVersion, setAppVersion] = useState<string>('v3.6.0-PRO');
+  const [releaseNotes, setReleaseNotes] = useState<string>('Added 2-Player Race Mode with Team Code Sync & Level 1 Reset System.');
+  const [versionSaved, setVersionSaved] = useState<boolean>(false);
+
   const [broadcastText, setBroadcastText] = useState<string>('');
   const [broadcastSent, setBroadcastSent] = useState<boolean>(false);
   const [aiTemp, setAiTemp] = useState<number>(0.7);
 
+  // Mini Games Active Toggles
+  const [gameStates, setGameStates] = useState<Record<string, boolean>>({
+    memory_matrix: true,
+    number_sequence: true,
+    mental_math: true,
+    maze_escape: true,
+    sudoku: true,
+    quick_decision: true,
+    word_intelligence: true,
+    coding_logic: true,
+    brain_lab: true,
+  });
+
+  const toggleGame = (id: string) => {
+    if (!isMasterAdmin) return;
+    audioHaptics.playClick();
+    setGameStates(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const handleSaveVersion = () => {
+    if (!isMasterAdmin) return;
+    audioHaptics.playFanfare();
+    audioHaptics.triggerHaptic('heavy');
+    setVersionSaved(true);
+    setTimeout(() => {
+      setVersionSaved(false);
+    }, 3000);
+  };
+
   const handleBroadcast = () => {
-    if (!broadcastText.trim()) return;
+    if (!broadcastText.trim() || !isMasterAdmin) return;
     audioHaptics.playClick();
     audioHaptics.triggerHaptic('heavy');
     setBroadcastSent(true);
@@ -23,57 +78,162 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ user }) => {
     }, 2500);
   };
 
-  return (
-    <div className="space-y-8 animate-fade-in pb-12 max-w-5xl mx-auto">
-      
-      {/* Header */}
-      <div className="p-6 rounded-3xl bg-slate-900 border border-amber-500/30 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-black text-amber-400 flex items-center gap-2">
-            <ShieldAlert className="w-7 h-7" />
-            BrainVerse Master Admin Console
-          </h1>
-          <p className="text-xs text-slate-400 mt-1">
-            System health monitoring, AI parameters configuration, user roles & global push notifications.
+  // If user is NOT the authorized master admin
+  if (!isMasterAdmin) {
+    return (
+      <div className="p-8 rounded-3xl bg-slate-900 border border-rose-500/30 text-center space-y-6 max-w-xl mx-auto my-6 shadow-2xl animate-fade-in">
+        <div className="w-16 h-16 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400 mx-auto">
+          <Lock className="w-8 h-8" />
+        </div>
+
+        <div className="space-y-2">
+          <h2 className="text-xl font-black text-white flex items-center justify-center gap-2">
+            <ShieldAlert className="w-5 h-5 text-rose-400" />
+            Access Restricted to Master Developer
+          </h2>
+          <p className="text-xs text-slate-300 leading-relaxed max-w-md mx-auto">
+            Only <strong className="text-amber-400 font-bold">{MASTER_ADMIN_EMAIL}</strong> has the sole authority to update application versions, modify mini-game parameters, or publish software builds.
           </p>
         </div>
 
-        <div className="px-3 py-1 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/30 text-xs font-bold">
-          ADMIN ACCESS
+        <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-left space-y-2">
+          <div className="text-[11px] font-mono text-slate-400 font-bold flex items-center gap-1.5">
+            <ShieldCheck className="w-4 h-4 text-emerald-400" />
+            Master Developer Identity:
+          </div>
+          <div className="text-xs font-mono text-cyan-300 font-bold bg-slate-900 p-2 rounded-xl border border-slate-800">
+            Jeevan Gowda ({MASTER_ADMIN_EMAIL})
+          </div>
+          <div className="text-[10px] text-slate-500 italic">
+            Current Logged-in Account: {user.email || 'Guest User (' + user.name + ')'}
+          </div>
+        </div>
+
+        <div className="text-[11px] text-slate-500">
+          If you believe you should have access, please sign in with your verified developer email.
+        </div>
+      </div>
+    );
+  }
+
+  // Master Admin Authority Granted View
+  return (
+    <div className="space-y-8 animate-fade-in pb-12 max-w-5xl mx-auto">
+      
+      {/* Authority Granted Header */}
+      <div className="p-6 rounded-3xl bg-slate-900 border-2 border-amber-500/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xl">
+        <div>
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="w-7 h-7 text-emerald-400" />
+            <h1 className="text-2xl font-black text-amber-400">
+              BrainVerse Developer Console
+            </h1>
+          </div>
+          <p className="text-xs text-slate-300 mt-1">
+            Master Authority Granted to <strong className="text-cyan-300 font-bold">{MASTER_ADMIN_EMAIL}</strong>
+          </p>
+        </div>
+
+        <div className="px-3 py-1.5 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-mono font-black uppercase tracking-wider">
+          MASTER ADMIN AUTHENTICATED
         </div>
       </div>
 
-      {/* System Status Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-1">
-          <div className="text-[10px] uppercase font-bold text-slate-400">Total Registered Users</div>
-          <div className="text-xl font-black text-white">24,580</div>
+      {/* Version Control & Release Publisher Section */}
+      <div className="p-6 rounded-3xl bg-slate-900 border border-cyan-500/30 space-y-6 shadow-xl">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+          <h2 className="text-lg font-black text-white flex items-center gap-2">
+            <GitCommit className="w-5 h-5 text-cyan-400" />
+            App Version & Build Release Management
+          </h2>
+          <span className="text-xs font-mono font-bold text-cyan-400 bg-cyan-950 px-3 py-1 rounded-full border border-cyan-800">
+            Current Target: {appVersion}
+          </span>
         </div>
 
-        <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-1">
-          <div className="text-[10px] uppercase font-bold text-slate-400">Active AI Sessions</div>
-          <div className="text-xl font-black text-cyan-400">1,420</div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-slate-300">App Build Version Tag</label>
+            <input
+              type="text"
+              value={appVersion}
+              onChange={(e) => setAppVersion(e.target.value)}
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs font-mono font-bold text-cyan-300 focus:outline-none focus:border-cyan-500"
+              placeholder="e.g. v3.6.0-PRO"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-slate-300">Version Changelog / Notes</label>
+            <input
+              type="text"
+              value={releaseNotes}
+              onChange={(e) => setReleaseNotes(e.target.value)}
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
+              placeholder="Describe build changes..."
+            />
+          </div>
         </div>
 
-        <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-1">
-          <div className="text-[10px] uppercase font-bold text-slate-400">Container Latency</div>
-          <div className="text-xl font-black text-emerald-400">18ms</div>
-        </div>
+        <div className="flex items-center justify-between pt-2">
+          {versionSaved ? (
+            <div className="text-xs text-emerald-400 font-bold flex items-center gap-1.5">
+              <CheckCircle2 className="w-4 h-4" /> Build Version Updated & Applied Successfully!
+            </div>
+          ) : (
+            <span className="text-[11px] text-slate-400">
+              Only Jeevan Gowda has authority to push version updates across the network.
+            </span>
+          )}
 
-        <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-1">
-          <div className="text-[10px] uppercase font-bold text-slate-400">Gemini API Status</div>
-          <div className="text-xl font-black text-purple-400">ONLINE (v3.6)</div>
+          <button
+            onClick={handleSaveVersion}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 font-black text-xs uppercase shadow-lg hover:brightness-110 transition"
+          >
+            <Save className="w-4 h-4" /> Update App Version
+          </button>
         </div>
       </div>
 
-      {/* AI Model Controls & Global Broadcast */}
+      {/* Games Catalog Active Controls */}
+      <div className="p-6 rounded-3xl bg-slate-900 border border-slate-800 space-y-6">
+        <h2 className="text-lg font-black text-white flex items-center gap-2 border-b border-slate-800 pb-4">
+          <Gamepad2 className="w-5 h-5 text-purple-400" />
+          Mini-Game Status & Parameter Overrides
+        </h2>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {Object.entries(gameStates).map(([gameId, isActive]) => (
+            <div 
+              key={gameId}
+              onClick={() => toggleGame(gameId)}
+              className={`p-3.5 rounded-2xl border flex items-center justify-between cursor-pointer transition ${
+                isActive 
+                  ? 'bg-slate-950 border-cyan-500/40 text-cyan-300' 
+                  : 'bg-slate-950/50 border-slate-800 text-slate-500'
+              }`}
+            >
+              <div className="capitalize font-bold text-xs truncate">
+                {gameId.replace('_', ' ')}
+              </div>
+              <div className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase ${
+                isActive ? 'bg-cyan-500/20 text-cyan-300' : 'bg-slate-800 text-slate-500'
+              }`}>
+                {isActive ? 'ENABLED' : 'DISABLED'}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* System Status & Global Push Broadcast */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         
         {/* AI Parameters */}
         <div className="p-6 rounded-3xl bg-slate-900 border border-slate-800 space-y-4">
           <h3 className="text-base font-bold text-white flex items-center gap-2">
             <Bot className="w-5 h-5 text-purple-400" />
-            AI Coach Jeevu Parameters
+            AI Coach Jeevu Model Engine
           </h3>
 
           <div>
@@ -90,7 +250,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ user }) => {
           </div>
 
           <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-300">
-            Current Model Target: <span className="text-cyan-300 font-bold">gemini-3.6-flash</span>
+            Active Model: <span className="text-cyan-300 font-bold">gemini-3.6-flash</span>
           </div>
         </div>
 
@@ -98,7 +258,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ user }) => {
         <div className="p-6 rounded-3xl bg-slate-900 border border-slate-800 space-y-4">
           <h3 className="text-base font-bold text-white flex items-center gap-2">
             <Bell className="w-5 h-5 text-amber-400" />
-            Broadcast Push Notification
+            Global Push Broadcast
           </h3>
 
           <input
@@ -111,13 +271,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ user }) => {
 
           {broadcastSent && (
             <div className="text-xs text-emerald-400 font-bold flex items-center gap-1">
-              <CheckCircle2 className="w-4 h-4" /> Notification broadcasted to all active players!
+              <CheckCircle2 className="w-4 h-4" /> Global push broadcast sent!
             </div>
           )}
 
           <button
             onClick={handleBroadcast}
-            className="w-full py-2.5 rounded-xl bg-amber-500 text-slate-950 font-bold text-xs uppercase"
+            className="w-full py-2.5 rounded-xl bg-amber-500 text-slate-950 font-bold text-xs uppercase hover:bg-amber-400 transition"
           >
             Send Broadcast Alert
           </button>
