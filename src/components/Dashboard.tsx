@@ -60,6 +60,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
     onSelectGame(gameId);
   };
 
+  const isRegisteredAccountLogin = Boolean(user.email && user.isReturningUser !== false && !user.isGuest);
+
   return (
     <div className="space-y-8 animate-fade-in pb-12">
       
@@ -84,7 +86,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
 
             <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-white">
-              Welcome back, <span className="text-[#00F5FF]">{user.name}</span>!
+              {isRegisteredAccountLogin ? (
+                <>Welcome back to <span className="text-[#00F5FF]">Jeevu's explorer!!</span></>
+              ) : (
+                <>Welcome to <span className="text-[#00F5FF]">Jeevu's explorer!!</span></>
+              )}
             </h1>
 
             <p className="text-xs sm:text-sm text-[#AAAAAA] italic border-l-2 border-[#00F5FF]/50 pl-3">

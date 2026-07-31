@@ -1,6 +1,6 @@
 import express from 'express';
 import path from 'path';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, Type } from '@google/genai';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -31,28 +31,54 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', app: 'BrainVerse MindForge AI', timestamp: new Date().toISOString() });
 });
 
-// AI Coach endpoint
+// AI Coach endpoint powered by Gemini AI
 app.post('/api/ai-coach', async (req, res) => {
   try {
-    const { message, history, userProfile, gameStats } = req.body;
+    const { message, history, userProfile } = req.body;
     const ai = getGenAI();
 
     if (!ai) {
       return res.json({
-        reply: `Hello ${userProfile?.name || 'Mind Explorer'}! I'm Jeevu, your MindForge AI Coach. (Running in offline mode since GEMINI_API_KEY is not set). Based on your recent focus and logic scores, I recommend practicing Memory Matrix and Mental Math today to strengthen your processing speed!`,
-        suggestions: ['How can I improve my memory?', 'Give me a quick focus tip', 'Analyze my weak areas'],
+        reply: `Hello ${userProfile?.name || 'Mind Explorer'}! I'm Jeevu, your MindForge AI Coach. (Running in offline preview mode). Based on your current stats, practicing Memory Matrix and Mental Math today will accelerate your processing speed and working memory!`,
+        suggestions: ['Analyze my weak skills', 'How can I improve working memory?', 'Recommend today\'s practice plan', 'Predict my 30-day score growth'],
+        recommendedGameId: 'memory_matrix',
+        takeawayTip: 'Consistent 10-minute daily training builds stronger neural pathways than sporadic long sessions.'
       });
     }
 
-    const systemInstruction = `You are "Jeevu", the world-class AI Cognitive Coach for BrainVerse (MindForge).
-User Profile: Name ${userProfile?.name || 'Explorer'}, Level ${userProfile?.level || 1}, Streak ${userProfile?.streak || 0} days, Overall Score ${userProfile?.brainScore || 1200}.
-Skill Ratings: Memory: ${userProfile?.ratings?.memory || 1000}, Logic: ${userProfile?.ratings?.logic || 1000}, Focus: ${userProfile?.ratings?.focus || 1000}, Math: ${userProfile?.ratings?.math || 1000}, Attention: ${userProfile?.ratings?.attention || 1000}, Speed: ${userProfile?.ratings?.speed || 1000}.
-User's Goals: ${userProfile?.goals?.join(', ') || 'General cognitive fitness'}.
+    const systemInstruction = `You are "Jeevu", an advanced AI Cognitive Coach & Master Mind Trainer for BrainVerse MindForge.
+User Profile: Name ${userProfile?.name || 'Explorer'}, Level ${userProfile?.level || 1}, Streak ${userProfile?.streak || 0} days, Overall Brain Score ${userProfile?.brainScore || 1200}.
+Skill Ratings:
+- Memory: ${userProfile?.ratings?.memory || 1000}
+- Logic: ${userProfile?.ratings?.logic || 1000}
+- Focus: ${userProfile?.ratings?.focus || 1000}
+- Math: ${userProfile?.ratings?.math || 1000}
+- Attention: ${userProfile?.ratings?.attention || 1000}
+- Speed: ${userProfile?.ratings?.speed || 1000}
+User's Goals: ${userProfile?.goals?.join(', ') || 'General cognitive fitness and peak mental performance'}.
 
-Your objective is to provide encouraging, scientifically grounded cognitive training advice, explain mistake patterns, recommend targeted mini-games, and motivate the user. Keep your tone energizing, friendly, concise, and structured.
-Important constraint: Frame advice around training cognitive skills like memory, attention, and logic. Do NOT make medical or scientific claims about raising IQ.`;
+Your objective is to provide high-intelligence, personalized cognitive coaching grounded in cognitive neuroscience, memory chunking techniques, attention focus strategies, and logical reasoning practices.
+If relevant to the user's question, recommend one of the available mini-game IDs:
+- "memory_matrix" (for working memory)
+- "number_sequence" (for pattern recognition)
+- "mental_math" (for processing speed & calculation)
+- "maze_escape" (for spatial planning)
+- "sudoku" (for logical deduction)
+- "quick_decision" (for reaction speed)
+- "word_intelligence" (for verbal fluency)
+- "coding_logic" (for algorithmic thinking)
+- "brain_lab" (for experimental cognitive tests)
 
-    const prompt = `User Message: "${message}"\n\nProvide a helpful, motivational response as Jeevu AI Coach. Format with bullet points if helpful, and end with 2 short follow-up question suggestions for the user.`;
+Respond with JSON adhering to the specified schema. Keep your tone energizing, friendly, professional, and clear.`;
+
+    // Construct prompt including recent conversation history if present
+    let historyContext = '';
+    if (Array.isArray(history) && history.length > 0) {
+      const recent = history.slice(-6);
+      historyContext = 'Recent conversation context:\n' + recent.map(h => `${h.sender === 'user' ? 'User' : 'Jeevu'}: ${h.text}`).join('\n') + '\n\n';
+    }
+
+    const prompt = `${historyContext}User Request: "${message}"\n\nProvide personalized cognitive coaching advice, follow-up suggestions, a golden takeaway tip, and an optional recommended mini-game ID if applicable.`;
 
     const response = await ai.models.generateContent({
       model: 'gemini-3.6-flash',
@@ -60,17 +86,41 @@ Important constraint: Frame advice around training cognitive skills like memory,
       config: {
         systemInstruction,
         temperature: 0.7,
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            reply: { type: Type.STRING, description: 'Detailed markdown-friendly coaching response' },
+            suggestions: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING },
+              description: '3 to 4 smart follow-up questions the user might ask next'
+            },
+            recommendedGameId: {
+              type: Type.STRING,
+              description: 'Optional game ID string: memory_matrix, number_sequence, mental_math, maze_escape, sudoku, quick_decision, word_intelligence, coding_logic, or brain_lab'
+            },
+            takeawayTip: { type: Type.STRING, description: 'A single concise golden takeaway tip' }
+          },
+          required: ['reply', 'suggestions']
+        }
       },
     });
 
+    const parsed = JSON.parse(response.text || '{}');
     res.json({
-      reply: response.text || "Keep pushing your cognitive boundaries every day!",
+      reply: parsed.reply || "Keep pushing your cognitive boundaries every day!",
+      suggestions: parsed.suggestions || ['Analyze my weak areas', 'Give me a quick focus tip'],
+      recommendedGameId: parsed.recommendedGameId || '',
+      takeawayTip: parsed.takeawayTip || ''
     });
   } catch (error: any) {
     console.warn('AI Coach Fallback Triggered:', error?.message);
     res.json({
-      reply: `Hello ${req.body?.userProfile?.name || 'Mind Explorer'}! I'm Jeevu, your MindForge AI Coach. Great job training today! Based on your recent focus and logic scores, I recommend practicing Memory Matrix and Mental Math today to strengthen your processing speed!`,
+      reply: `Hello ${req.body?.userProfile?.name || 'Mind Explorer'}! I'm Jeevu, your MindForge AI Coach. Great effort on your cognitive training today! Based on your scores, I recommend practicing Memory Matrix & Mental Math to sharpen your processing speed and working memory.`,
       suggestions: ['How can I improve my memory?', 'Give me a quick focus tip', 'Analyze my weak areas'],
+      recommendedGameId: 'memory_matrix',
+      takeawayTip: 'Short daily focus sessions build stronger neural plasticity than occasional marathons.'
     });
   }
 });

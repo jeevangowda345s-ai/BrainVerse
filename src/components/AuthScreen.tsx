@@ -118,6 +118,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
           brainScore: 100,
           rank: 'Apprentice Mind',
           isOnboarded: true,
+          isReturningUser: false,
+          isGuest: false,
         };
 
         await saveUserProfileToFirestore(newProfile);
@@ -138,11 +140,15 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
           ...existingProfile,
           id: firebaseUser.uid,
           email: firebaseUser.email || email.trim(),
+          isReturningUser: true,
+          isGuest: false,
         } : {
           ...currentUser,
           id: firebaseUser.uid,
           email: firebaseUser.email || email.trim(),
           name: firebaseUser.displayName || currentUser.name,
+          isReturningUser: true,
+          isGuest: false,
         };
 
         if (!existingProfile) {
@@ -204,6 +210,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         name: gUser.displayName || existingProfile.name,
         avatar: gUser.photoURL || existingProfile.avatar || '🧠',
         email: gUser.email || existingProfile.email || '',
+        isReturningUser: true,
+        isGuest: false,
       } : {
         ...currentUser,
         id: gUser.uid,
@@ -216,6 +224,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         brainScore: 100,
         rank: 'Apprentice Mind',
         isOnboarded: true,
+        isReturningUser: false,
+        isGuest: false,
       };
 
       await saveUserProfileToFirestore(profile);
@@ -259,6 +269,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         xp: 0,
         brainScore: 100,
         rank: 'Apprentice Mind',
+        isReturningUser: false,
+        isGuest: true,
       };
       await saveUserProfileToFirestore(profile);
       onAuthSuccess(profile);

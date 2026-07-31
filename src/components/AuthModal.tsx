@@ -118,6 +118,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           brainScore: 100,
           rank: 'Apprentice Mind',
           isOnboarded: true,
+          isReturningUser: false,
+          isGuest: false,
         };
 
         await saveUserProfileToFirestore(newProfile);
@@ -140,11 +142,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           ...existingProfile,
           id: firebaseUser.uid,
           email: firebaseUser.email || email.trim(),
+          isReturningUser: true,
+          isGuest: false,
         } : {
           ...currentUser,
           id: firebaseUser.uid,
           email: firebaseUser.email || email.trim(),
           name: firebaseUser.displayName || currentUser.name,
+          isReturningUser: true,
+          isGuest: false,
         };
 
         if (!existingProfile) {
@@ -209,6 +215,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         name: gUser.displayName || existingProfile.name,
         avatar: gUser.photoURL || existingProfile.avatar || '🧠',
         email: gUser.email || existingProfile.email || '',
+        isReturningUser: true,
+        isGuest: false,
       } : {
         ...currentUser,
         id: gUser.uid,
@@ -221,6 +229,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         brainScore: 100,
         rank: 'Apprentice Mind',
         isOnboarded: true,
+        isReturningUser: false,
+        isGuest: false,
       };
 
       await saveUserProfileToFirestore(profile);

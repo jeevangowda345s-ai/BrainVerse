@@ -456,7 +456,7 @@ export default function App() {
         )}
 
         {activeTab === 'coach' && (
-          <AICoach user={user} />
+          <AICoach user={user} onSelectGame={handleSelectGame} />
         )}
 
         {activeTab === 'analytics' && (

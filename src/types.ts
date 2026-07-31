@@ -62,6 +62,8 @@ export interface UserProfile {
   unlockedCosmetics: string[];
   isPremium: boolean;
   isOnboarded: boolean;
+  isReturningUser?: boolean;
+  isGuest?: boolean;
   lastWheelSpinDate?: string;
   aiRoadmap?: AIRoadmap;
 }
@@ -157,6 +159,8 @@ export interface AICoachMessage {
   text: string;
   timestamp: string;
   suggestions?: string[];
+  recommendedGameId?: string;
+  takeawayTip?: string;
   insights?: {
     strength?: string;
     weakness?: string;
