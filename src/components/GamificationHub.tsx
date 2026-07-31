@@ -31,6 +31,7 @@ interface GamificationHubProps {
   onUpdateCoins: (amount: number) => void;
   onClaimWheelReward?: (rewards: { coins?: number; brainScore?: number; diamonds?: number; xp?: number; spinDate?: string }) => void;
   onTestTriggerToast?: (achievement: Achievement) => void;
+  onTestLevelUp?: () => void;
 }
 
 export const GamificationHub: React.FC<GamificationHubProps> = ({
@@ -41,6 +42,7 @@ export const GamificationHub: React.FC<GamificationHubProps> = ({
   onUpdateCoins,
   onClaimWheelReward,
   onTestTriggerToast,
+  onTestLevelUp,
 }) => {
   const [spinning, setSpinning] = useState<boolean>(false);
   const [wheelPrize, setWheelPrize] = useState<WheelReward | null>(null);
@@ -231,9 +233,21 @@ export const GamificationHub: React.FC<GamificationHubProps> = ({
               Complete game milestones & training challenges to unlock badges, XP, and coins.
             </p>
           </div>
-          <span className="px-3 py-1 rounded-xl bg-amber-950/40 border border-amber-500/30 text-amber-300 text-xs font-extrabold self-start sm:self-auto">
-            {achievements.filter(a => a.unlocked).length} / {achievements.length} Unlocked
-          </span>
+          <div className="flex items-center gap-2">
+            {onTestLevelUp && (
+              <button
+                onClick={onTestLevelUp}
+                className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500/20 to-purple-500/20 border border-amber-500/40 text-amber-300 text-xs font-bold hover:brightness-110 active:scale-95 transition flex items-center gap-1.5"
+                title="Preview Level Up animation modal"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-spin" />
+                <span>Preview Level Up 🎉</span>
+              </button>
+            )}
+            <span className="px-3 py-1 rounded-xl bg-amber-950/40 border border-amber-500/30 text-amber-300 text-xs font-extrabold self-start sm:self-auto">
+              {achievements.filter(a => a.unlocked).length} / {achievements.length} Unlocked
+            </span>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">

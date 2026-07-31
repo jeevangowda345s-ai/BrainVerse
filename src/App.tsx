@@ -17,6 +17,8 @@ import { OnboardingModal } from './components/OnboardingModal';
 import { SettingsModal } from './components/SettingsModal';
 import { AuthModal } from './components/AuthModal';
 import { AuthScreen } from './components/AuthScreen';
+import { LevelUpModal } from './components/LevelUpModal';
+import { getRankForLevel } from './utils/ranks';
 
 // Mini Games
 import { MemoryMatrix } from './components/games/MemoryMatrix';
@@ -84,6 +86,28 @@ export default function App() {
   const [showAdminModal, setShowAdminModal] = useState<boolean>(false);
   const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
   const [unlockedToastAchievement, setUnlockedToastAchievement] = useState<Achievement | null>(null);
+  const [levelUpModalState, setLevelUpModalState] = useState<{ isOpen: boolean; oldLevel: number; newLevel: number } | null>(null);
+
+  // Level Up Trigger Handler
+  const triggerLevelUp = (oldLevel: number, newLevel: number) => {
+    const newRank = getRankForLevel(newLevel);
+    const bonusCoins = newLevel * 100;
+    const bonusDiamonds = 15;
+
+    setUser(prev => ({
+      ...prev,
+      coins: (prev.coins || 0) + bonusCoins,
+      diamonds: (prev.diamonds || 0) + bonusDiamonds,
+      brainEnergy: prev.maxEnergy || 100,
+      rank: newRank.title,
+    }));
+
+    setLevelUpModalState({
+      isOpen: true,
+      oldLevel,
+      newLevel,
+    });
+  };
 
   // Authentication Enforcement State
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
@@ -167,6 +191,7 @@ export default function App() {
     audioHaptics.triggerHaptic('success');
 
     setUser(prevUser => {
+      const currentLevel = prevUser.level || 1;
       const addedCoins = rewards.coins || 0;
       const addedBrain = rewards.brainScore || 0;
       const addedDiamonds = rewards.diamonds || 0;
@@ -174,6 +199,12 @@ export default function App() {
 
       const newXP = (prevUser.xp || 0) + addedXP;
       const newLevel = Math.floor(newXP / 300) + 1;
+
+      if (newLevel > currentLevel) {
+        setTimeout(() => {
+          triggerLevelUp(currentLevel, newLevel);
+        }, 400);
+      }
 
       return {
         ...prevUser,
@@ -223,11 +254,18 @@ export default function App() {
 
     // Functional State Update to guarantee coins and XP add up correctly without stale closures
     setUser(prevUser => {
+      const currentLevel = prevUser.level || 1;
       const newXP = (prevUser.xp || 0) + xpGained;
       const newLevel = Math.floor(newXP / 300) + 1;
       const newBrainScore = (prevUser.brainScore || 1000) + Math.round(score / 20);
       const currentRating = prevUser.ratings[categoryRatingKey] || 1200;
       const newRating = Math.min(2500, currentRating + Math.round(score / 30));
+
+      if (newLevel > currentLevel) {
+        setTimeout(() => {
+          triggerLevelUp(currentLevel, newLevel);
+        }, 400);
+      }
 
       return {
         ...prevUser,
@@ -300,11 +338,24 @@ export default function App() {
       const rewardCoins = targetMission.rewardCoins || 50;
       const rewardXP = targetMission.rewardXP || 100;
 
-      setUser(prev => ({
-        ...prev,
-        xp: (prev.xp || 0) + rewardXP,
-        coins: (prev.coins || 0) + rewardCoins,
-      }));
+      setUser(prev => {
+        const currentLevel = prev.level || 1;
+        const newXP = (prev.xp || 0) + rewardXP;
+        const newLevel = Math.floor(newXP / 300) + 1;
+
+        if (newLevel > currentLevel) {
+          setTimeout(() => {
+            triggerLevelUp(currentLevel, newLevel);
+          }, 400);
+        }
+
+        return {
+          ...prev,
+          xp: newXP,
+          level: newLevel,
+          coins: (prev.coins || 0) + rewardCoins,
+        };
+      });
 
       if (user.id) {
         addCoinsInFirestore(user.id, rewardCoins);
@@ -425,6 +476,7 @@ export default function App() {
             onUpdateCoins={handleUpdateCoins}
             onClaimWheelReward={handleClaimWheelReward}
             onTestTriggerToast={(ach) => setUnlockedToastAchievement(ach)}
+            onTestLevelUp={() => triggerLevelUp(user.level || 1, (user.level || 1) + 1)}
           />
         )}
 
@@ -500,6 +552,17 @@ export default function App() {
         achievement={unlockedToastAchievement}
         onClose={() => setUnlockedToastAchievement(null)}
       />
+
+      {/* Full-Screen Specialized Level Up Modal Animation */}
+      {levelUpModalState && (
+        <LevelUpModal
+          isOpen={levelUpModalState.isOpen}
+          oldLevel={levelUpModalState.oldLevel}
+          newLevel={levelUpModalState.newLevel}
+          user={user}
+          onClose={() => setLevelUpModalState(null)}
+        />
+      )}
 
     </div>
   );
