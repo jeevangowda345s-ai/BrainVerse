@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   X, 
   Mail, 
@@ -12,7 +12,9 @@ import {
   ShieldCheck,
   Globe,
   KeyRound,
-  ArrowRight
+  ArrowRight,
+  Camera,
+  Upload
 } from 'lucide-react';
 import { 
   auth, 
@@ -45,9 +47,38 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
+  const [selectedAvatar, setSelectedAvatar] = useState<string>(currentUser.avatar || '🧠');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const cameraInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleAvatarFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 200;
+        canvas.height = 200;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          const size = Math.min(img.width, img.height);
+          const startX = (img.width - size) / 2;
+          const startY = (img.height - size) / 2;
+          ctx.drawImage(img, startX, startY, size, size, 0, 0, 200, 200);
+          setSelectedAvatar(canvas.toDataURL('image/jpeg', 0.85));
+        }
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
 
   if (!isOpen) return null;
 
@@ -113,6 +144,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           name: name.trim(),
           username: username.trim() || name.toLowerCase().replace(/\s+/g, '_'),
           email: firebaseUser.email || email.trim(),
+          avatar: selectedAvatar || currentUser.avatar || '🧠',
           level: 1,
           xp: 0,
           brainScore: 100,
@@ -441,6 +473,54 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             <form onSubmit={handleEmailAuth} className="space-y-3">
               {tab === 'register' && (
                 <>
+                  {/* Profile Avatar Selection & Capture Bar */}
+                  <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
+                    <label className="block text-[11px] font-bold text-slate-400">Profile Avatar Photo</label>
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-xl bg-slate-900 border border-cyan-400/50 p-0.5 overflow-hidden flex items-center justify-center shrink-0">
+                        {selectedAvatar && (selectedAvatar.startsWith('data:') || selectedAvatar.startsWith('http') || selectedAvatar.includes('/')) ? (
+                          <img src={selectedAvatar} alt="Avatar" className="w-full h-full object-cover rounded-lg" />
+                        ) : (
+                          <span className="text-2xl">{selectedAvatar}</span>
+                        )}
+                      </div>
+
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => cameraInputRef.current?.click()}
+                          className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-300 font-bold text-[10px] flex items-center gap-1 border border-slate-700 transition"
+                        >
+                          <Camera className="w-3.5 h-3.5 text-cyan-400" /> Capture
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-purple-300 font-bold text-[10px] flex items-center gap-1 border border-slate-700 transition"
+                        >
+                          <Upload className="w-3.5 h-3.5 text-purple-400" /> Upload
+                        </button>
+                      </div>
+
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleAvatarFileSelect}
+                        className="hidden"
+                      />
+                      <input
+                        ref={cameraInputRef}
+                        type="file"
+                        accept="image/*"
+                        capture="user"
+                        onChange={handleAvatarFileSelect}
+                        className="hidden"
+                      />
+                    </div>
+                  </div>
+
                   <div>
                     <label className="block text-[11px] font-bold text-slate-400 mb-1">Full Name</label>
                     <div className="relative">

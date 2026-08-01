@@ -40,6 +40,7 @@ interface NavbarProps {
   onSignOut: () => void;
   onOpenRedeemCash: () => void;
   onOpenPremium: () => void;
+  onOpenAvatarModal?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -54,6 +55,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onSignOut,
   onOpenRedeemCash,
   onOpenPremium,
+  onOpenAvatarModal,
 }) => {
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Brain },
@@ -256,15 +258,17 @@ export const Navbar: React.FC<NavbarProps> = ({
               );
             })()}
 
-            {/* Master Dev Authority / Admin Panel Button */}
-            <button
-              onClick={onOpenAdmin}
-              className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20 transition-all text-xs font-bold"
-              title="Developer Authority & Version Console"
-            >
-              <ShieldAlert className="w-4 h-4 text-amber-400" />
-              <span className="hidden lg:inline">Dev Console</span>
-            </button>
+            {/* Master Dev Authority / Admin Panel Button - RESTRICTED STRICTLY TO jeevangowda345s@gmail.com */}
+            {user.email && user.email.toLowerCase() === 'jeevangowda345s@gmail.com' && (
+              <button
+                onClick={onOpenAdmin}
+                className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20 transition-all text-xs font-bold"
+                title="Developer Authority & Version Console"
+              >
+                <ShieldAlert className="w-4 h-4 text-amber-400" />
+                <span className="hidden lg:inline">Dev Console</span>
+              </button>
+            )}
 
             {/* Auth / Register Account Button */}
             <button
@@ -297,9 +301,16 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             {/* User Avatar */}
             <div 
-              onClick={() => handleTabChange('dashboard')}
+              onClick={() => {
+                audioHaptics.playClick();
+                if (onOpenAvatarModal) {
+                  onOpenAvatarModal();
+                } else {
+                  handleTabChange('dashboard');
+                }
+              }}
               className="flex items-center gap-2 pl-1 cursor-pointer group"
-              title={`${user.name} (${user.email || 'Guest Player'})`}
+              title="Click to change or capture profile avatar photo"
             >
               <div className="w-9 h-9 rounded-xl bg-[#00F5FF]/20 p-0.5 border border-[#00F5FF]/40 group-hover:border-[#00F5FF] transition shadow-[0_0_10px_rgba(0,245,255,0.2)] overflow-hidden">
                 <div className="w-full h-full rounded-[10px] bg-[#050505] flex items-center justify-center text-lg font-bold overflow-hidden">

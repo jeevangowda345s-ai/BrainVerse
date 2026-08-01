@@ -21,5 +21,15 @@ service cloud.firestore {
     match /activityFeed/{activityId} {
       allow read, write: if true;
     }
+
+    // PRO Upgrade UTR Requests
+    match /pro_upgrade_requests/{reqId} {
+      allow read, write: if true;
+    }
+
+    // Redemption Records
+    match /redemptions/{redemptionId} {
+      allow read, write: if true;
+    }
   }
 }

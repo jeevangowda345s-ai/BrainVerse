@@ -20,6 +20,7 @@ import { AuthScreen } from './components/AuthScreen';
 import { LevelUpModal } from './components/LevelUpModal';
 import { RedeemCashModal } from './components/RedeemCashModal';
 import { PremiumMembershipModal } from './components/PremiumMembershipModal';
+import { AvatarModal } from './components/AvatarModal';
 import { getRankForLevel } from './utils/ranks';
 
 // Mini Games
@@ -90,6 +91,7 @@ export default function App() {
   const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
   const [showRedeemCashModal, setShowRedeemCashModal] = useState<boolean>(false);
   const [showPremiumModal, setShowPremiumModal] = useState<boolean>(false);
+  const [showAvatarModal, setShowAvatarModal] = useState<boolean>(false);
   const [unlockedToastAchievement, setUnlockedToastAchievement] = useState<Achievement | null>(null);
   const [levelUpModalState, setLevelUpModalState] = useState<{ isOpen: boolean; oldLevel: number; newLevel: number } | null>(null);
 
@@ -104,19 +106,6 @@ export default function App() {
       };
       saveUserProfile(updatedUser);
       saveUserProfileToFirestore(updatedUser).catch(e => console.warn('Firestore redeem sync:', e));
-      return updatedUser;
-    });
-  };
-
-  // Quick Add Test Coins Handler
-  const handleAddTestCoins = (amount: number) => {
-    setUser(prev => {
-      const updatedUser = {
-        ...prev,
-        coins: (prev.coins || 0) + amount,
-      };
-      saveUserProfile(updatedUser);
-      saveUserProfileToFirestore(updatedUser).catch(e => console.warn('Firestore coins sync:', e));
       return updatedUser;
     });
   };
@@ -502,6 +491,7 @@ export default function App() {
         onSignOut={handleSignOut}
         onOpenRedeemCash={() => setShowRedeemCashModal(true)}
         onOpenPremium={() => setShowPremiumModal(true)}
+        onOpenAvatarModal={() => setShowAvatarModal(true)}
       />
 
       {/* Main View Area */}
@@ -516,6 +506,7 @@ export default function App() {
             onClaimMission={handleClaimMission}
             onUpdateUser={handleUpdateUser}
             onOpenPremium={() => setShowPremiumModal(true)}
+            onOpenAvatarModal={() => setShowAvatarModal(true)}
           />
         )}
 
@@ -601,8 +592,8 @@ export default function App() {
         />
       )}
 
-      {/* Admin Panel Modal */}
-      {showAdminModal && (
+      {/* Admin Panel Modal - Restricted to Master Admin Email */}
+      {showAdminModal && user.email?.toLowerCase() === 'jeevangowda345s@gmail.com' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xl">
           <div className="relative w-full max-w-4xl bg-slate-900 border border-amber-500/30 rounded-3xl p-6 sm:p-8 max-h-[90vh] overflow-y-auto">
             <button
@@ -644,13 +635,20 @@ export default function App() {
         onClose={() => setShowRedeemCashModal(false)}
         user={user}
         onRedeemSuccess={handleRedeemSuccess}
-        onAddTestCoins={handleAddTestCoins}
       />
 
       {/* MindForge PRO Premium Membership Modal (₹299 INR) */}
       <PremiumMembershipModal
         isOpen={showPremiumModal}
         onClose={() => setShowPremiumModal(false)}
+        user={user}
+        onUpdateUser={handleUpdateUser}
+      />
+
+      {/* Profile Avatar Capture & Selection Modal */}
+      <AvatarModal
+        isOpen={showAvatarModal}
+        onClose={() => setShowAvatarModal(false)}
         user={user}
         onUpdateUser={handleUpdateUser}
       />

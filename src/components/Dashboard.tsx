@@ -14,7 +14,8 @@ import {
   Activity,
   Award,
   BookOpen,
-  Crown
+  Crown,
+  Camera
 } from 'lucide-react';
 import { UserProfile, GameInfo, DailyMission, CognitiveRatings } from '../types';
 import { INITIAL_GAMES, loadQRMerchantConfig } from '../utils/storage';
@@ -29,6 +30,7 @@ interface DashboardProps {
   onClaimMission: (missionId: string) => void;
   onUpdateUser: (updatedUser: UserProfile) => void;
   onOpenPremium?: () => void;
+  onOpenAvatarModal?: () => void;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
@@ -39,6 +41,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onClaimMission,
   onUpdateUser,
   onOpenPremium,
+  onOpenAvatarModal,
 }) => {
   const dailyQuotes = [
     "“The mind is not a vessel to be filled, but a fire to be kindled.” — Plutarch",
@@ -79,22 +82,53 @@ export const Dashboard: React.FC<DashboardProps> = ({
           
           {/* Left: Greeting & Brain Score */}
           <div className="lg:col-span-7 space-y-4">
-            <div className="flex items-center gap-2">
-              <span className="px-3 py-1 rounded bg-[#00F5FF]/10 text-[#00F5FF] border border-[#00F5FF]/30 text-[10px] font-mono font-bold tracking-widest uppercase flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5" /> Daily Cognitive Status
-              </span>
-              <span className="px-3 py-1 rounded bg-purple-500/10 text-purple-300 border border-purple-500/30 text-[10px] font-mono font-bold uppercase tracking-wider">
-                {user.rank}
-              </span>
-            </div>
+            
+            {/* User Profile Avatar Header Banner */}
+            <div className="flex items-center gap-4">
+              <div 
+                onClick={onOpenAvatarModal}
+                className="relative group cursor-pointer shrink-0"
+                title="Click to capture or change profile avatar photo"
+              >
+                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-slate-950 p-1 border-2 border-[#00F5FF] group-hover:border-purple-400 transition shadow-[0_0_20px_rgba(0,245,255,0.3)] overflow-hidden flex items-center justify-center">
+                  {user.avatar && (user.avatar.startsWith('data:') || user.avatar.startsWith('http') || user.avatar.includes('/')) ? (
+                    <img 
+                      src={user.avatar} 
+                      alt={user.name} 
+                      className="w-full h-full object-cover rounded-xl"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <span className="text-3xl sm:text-4xl">{user.avatar || '🧠'}</span>
+                  )}
+                </div>
 
-            <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-white">
-              {isRegisteredAccountLogin ? (
-                <>Welcome back to <span className="text-[#00F5FF]">Jeevu's explorer!!</span></>
-              ) : (
-                <>Welcome to <span className="text-[#00F5FF]">Jeevu's explorer!!</span></>
-              )}
-            </h1>
+                {/* Camera Overlay Badge */}
+                <div className="absolute -bottom-1 -right-1 p-1.5 rounded-xl bg-[#00F5FF] text-slate-950 font-black shadow-lg group-hover:scale-110 transition">
+                  <Camera className="w-3.5 h-3.5" />
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="px-2.5 py-0.5 rounded bg-[#00F5FF]/10 text-[#00F5FF] border border-[#00F5FF]/30 text-[10px] font-mono font-bold tracking-widest uppercase flex items-center gap-1">
+                    <Sparkles className="w-3 h-3" /> Daily Status
+                  </span>
+                  <span className="px-2.5 py-0.5 rounded bg-purple-500/10 text-purple-300 border border-purple-500/30 text-[10px] font-mono font-bold uppercase tracking-wider">
+                    {user.rank}
+                  </span>
+                </div>
+
+                <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
+                  {isRegisteredAccountLogin ? (
+                    <>Welcome back to <span className="text-[#00F5FF]">Jeevu's explorer!!</span></>
+                  ) : (
+                    <>Welcome to <span className="text-[#00F5FF]">Jeevu's explorer!!</span></>
+                  )}
+                </h1>
+                <p className="text-xs text-slate-400 font-medium">{user.name} ({user.email || 'Guest Explorer'})</p>
+              </div>
+            </div>
 
             <p className="text-xs sm:text-sm text-[#AAAAAA] italic border-l-2 border-[#00F5FF]/50 pl-3">
               {todayQuote}

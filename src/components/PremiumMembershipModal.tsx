@@ -272,27 +272,75 @@ export const PremiumMembershipModal: React.FC<PremiumMembershipModalProps> = ({
             </div>
           </div>
 
-          {/* PhonePe QR Code Display */}
+          {/* UPI QR Code Display & UPI Options */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-center">
             
-            {/* QR Scanner Image */}
-            <div className="text-center p-4 rounded-2xl bg-white border-4 border-[#5f259f] shadow-xl relative inline-block mx-auto">
+            {/* QR Scanner Image & UPI Options Section */}
+            <div className="text-center p-4 rounded-2xl bg-white border-4 border-[#5f259f] shadow-xl relative inline-block mx-auto space-y-3">
               <div className="text-[10px] font-black uppercase text-[#5f259f] tracking-wider mb-1">
-                Scan via PhonePe / GPay / Paytm
+                Scan QR Code with any UPI App
               </div>
               {qrDataUrl ? (
                 <img
                   src={qrDataUrl}
-                  alt="PhonePe PRO QR Scanner"
-                  className="w-48 h-48 mx-auto object-contain rounded-lg"
+                  alt="MindForge PRO UPI QR Scanner"
+                  className="w-44 h-44 mx-auto object-contain rounded-lg"
                 />
               ) : (
-                <div className="w-48 h-48 flex items-center justify-center bg-slate-100 rounded text-slate-600 text-xs font-bold">
+                <div className="w-44 h-44 flex items-center justify-center bg-slate-100 rounded text-slate-600 text-xs font-bold">
                   Loading QR Scanner...
                 </div>
               )}
-              <div className="text-[10px] font-mono font-bold text-slate-700 mt-1">
+              <div className="text-[10px] font-mono font-bold text-slate-800">
                 Amount: ₹{MEMBERSHIP_FEE_INR}.00 INR
+              </div>
+
+              {/* UPI Options below the scanner */}
+              <div className="pt-2 border-t border-slate-200 space-y-2">
+                <div className="text-[11px] font-extrabold text-purple-900 uppercase tracking-wider">
+                  UPI Options — Tap to Pay Directly:
+                </div>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    onClick={() => {
+                      audioHaptics.playClick();
+                      window.location.href = upiPayString;
+                    }}
+                    className="py-2 px-2.5 rounded-xl bg-[#5f259f] text-white font-bold text-[11px] hover:bg-purple-800 transition flex items-center justify-center gap-1 shadow-sm"
+                  >
+                    <span>💜 PhonePe</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      audioHaptics.playClick();
+                      window.location.href = upiPayString;
+                    }}
+                    className="py-2 px-2.5 rounded-xl bg-[#1a73e8] text-white font-bold text-[11px] hover:bg-blue-700 transition flex items-center justify-center gap-1 shadow-sm"
+                  >
+                    <span>🔵 GPay</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      audioHaptics.playClick();
+                      window.location.href = upiPayString;
+                    }}
+                    className="py-2 px-2.5 rounded-xl bg-[#00baf2] text-white font-bold text-[11px] hover:bg-sky-600 transition flex items-center justify-center gap-1 shadow-sm"
+                  >
+                    <span>📲 Paytm</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      audioHaptics.playClick();
+                      window.location.href = upiPayString;
+                    }}
+                    className="py-2 px-2.5 rounded-xl bg-emerald-600 text-white font-bold text-[11px] hover:bg-emerald-700 transition flex items-center justify-center gap-1 shadow-sm"
+                  >
+                    <span>⚡ BHIM / Any UPI</span>
+                  </button>
+                </div>
               </div>
             </div>
 

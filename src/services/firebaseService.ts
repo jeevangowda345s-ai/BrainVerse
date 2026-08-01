@@ -372,15 +372,23 @@ export async function submitProUpgradeRequestToFirestore(request: ProUpgradeRequ
 // Fetch all PRO Upgrade Requests for Admin Review
 export async function fetchProUpgradeRequestsFromFirestore(): Promise<ProUpgradeRequest[]> {
   try {
-    const q = query(collection(db, 'pro_upgrade_requests'), orderBy('timestamp', 'desc'), limit(50));
-    const snap = await getDocs(q);
+    let snap;
+    try {
+      const q = query(collection(db, 'pro_upgrade_requests'), orderBy('timestamp', 'desc'), limit(50));
+      snap = await getDocs(q);
+    } catch (e) {
+      // Fallback if index or orderBy constraints fail
+      snap = await getDocs(collection(db, 'pro_upgrade_requests'));
+    }
     const results: ProUpgradeRequest[] = [];
     snap.forEach((docSnap) => {
       results.push({ id: docSnap.id, ...docSnap.data() } as ProUpgradeRequest);
     });
+    // Sort in memory descending by timestamp
+    results.sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime());
     return results;
   } catch (err) {
-    console.error('Error fetching PRO upgrade requests from Firestore:', err);
+    console.warn('Error fetching PRO upgrade requests from Firestore:', err);
     return [];
   }
 }

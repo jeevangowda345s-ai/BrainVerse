@@ -31,7 +31,6 @@ interface RedeemCashModalProps {
   onClose: () => void;
   user: UserProfile;
   onRedeemSuccess: (record: RedemptionRecord, coinsDeducted: number) => void;
-  onAddTestCoins?: (amount: number) => void;
 }
 
 export const RedeemCashModal: React.FC<RedeemCashModalProps> = ({
@@ -39,7 +38,6 @@ export const RedeemCashModal: React.FC<RedeemCashModalProps> = ({
   onClose,
   user,
   onRedeemSuccess,
-  onAddTestCoins,
 }) => {
   const [activeTab, setActiveTab] = useState<'redeem' | 'history'>('redeem');
   
@@ -123,14 +121,6 @@ export const RedeemCashModal: React.FC<RedeemCashModalProps> = ({
   const handlePresetSelect = (amountCoins: number) => {
     setCoinsToRedeem(amountCoins);
     audioHaptics.playClick();
-  };
-
-  const handleAddTestCoins = () => {
-    if (onAddTestCoins) {
-      onAddTestCoins(10000000); // Add 10,000,000 test coins
-      audioHaptics.playFanfare();
-      audioHaptics.triggerHaptic('success');
-    }
   };
 
   const handleSubmitRedemption = async (e: React.FormEvent) => {
@@ -229,24 +219,24 @@ export const RedeemCashModal: React.FC<RedeemCashModalProps> = ({
       />
 
       {/* Main Container Card */}
-      <div className="relative w-full max-w-3xl bg-[#090A0F] border border-emerald-500/30 rounded-3xl p-5 sm:p-8 shadow-[0_0_50px_rgba(16,185,129,0.15)] z-10 my-auto text-slate-100 space-y-6">
+      <div className="relative w-full max-w-3xl max-h-[90vh] overflow-y-auto bg-[#090A0F] border border-emerald-500/30 rounded-3xl p-4 sm:p-6 lg:p-8 shadow-[0_0_50px_rgba(16,185,129,0.15)] z-10 my-auto text-slate-100 space-y-5 sm:space-y-6">
         
         {/* Header Title & Controls */}
         <div className="flex items-center justify-between border-b border-slate-800/80 pb-4">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-500 via-teal-500 to-cyan-500 p-0.5 shadow-lg shadow-emerald-500/20">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-tr from-emerald-500 via-teal-500 to-cyan-500 p-0.5 shadow-lg shadow-emerald-500/20 shrink-0">
               <div className="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center text-emerald-400">
-                <IndianRupee className="w-6 h-6" />
+                <IndianRupee className="w-5 h-5 sm:w-6 sm:h-6" />
               </div>
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">Redeem Coins for Real Cash</h2>
+                <h2 className="text-lg sm:text-2xl font-black text-white tracking-tight">Redeem Coins for Real Cash</h2>
                 <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-mono font-bold uppercase tracking-wider">
                   REAL PAYOUTS
                 </span>
               </div>
-              <p className="text-xs text-slate-400">
+              <p className="text-[11px] sm:text-xs text-slate-400">
                 Convert your Brain Coins to Indian Rupees (₹) via PhonePe / UPI & Bank Transfer.
               </p>
             </div>
@@ -254,41 +244,30 @@ export const RedeemCashModal: React.FC<RedeemCashModalProps> = ({
 
           <button
             onClick={onClose}
-            className="w-9 h-9 rounded-full bg-slate-900 border border-slate-800 text-slate-400 hover:text-white flex items-center justify-center text-base font-bold transition hover:border-slate-700"
+            className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-slate-900 border border-slate-800 text-slate-400 hover:text-white flex items-center justify-center text-base font-bold transition hover:border-slate-700 shrink-0"
           >
             ✕
           </button>
         </div>
 
-        {/* User Coin Balance Banner & Quick Add Test Coins */}
-        <div className="p-4 rounded-2xl bg-gradient-to-r from-slate-900 via-slate-950 to-emerald-950/40 border border-emerald-500/30 flex flex-col sm:flex-row items-center justify-between gap-4">
+        {/* User Coin Balance Banner */}
+        <div className="p-4 rounded-2xl bg-gradient-to-r from-slate-900 via-slate-950 to-emerald-950/40 border border-emerald-500/30 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
               <Coins className="w-5 h-5 animate-bounce" />
             </div>
             <div>
               <div className="text-[11px] font-mono text-slate-400 uppercase tracking-wider">Your Available Balance</div>
-              <div className="text-xl font-black text-amber-400 font-mono">
+              <div className="text-lg sm:text-xl font-black text-amber-400 font-mono">
                 {user.coins.toLocaleString()} <span className="text-xs text-slate-400 font-sans font-normal">Brain Coins</span>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <div className="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 text-xs font-mono font-bold">
+          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+            <div className="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 text-xs font-mono font-bold w-full sm:w-auto text-center">
               Rate: <span className="text-emerald-400">1,000,000 Coins = ₹1 INR</span>
             </div>
-            {onAddTestCoins && (
-              <button
-                type="button"
-                onClick={handleAddTestCoins}
-                className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500/20 to-yellow-500/20 border border-amber-500/40 text-amber-300 text-xs font-bold hover:brightness-110 active:scale-95 transition flex items-center gap-1 shrink-0"
-                title="Add 10,000,000 test coins to test redemption"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                <span>+10M Test Coins</span>
-              </button>
-            )}
           </div>
         </div>
 
@@ -620,7 +599,7 @@ export const RedeemCashModal: React.FC<RedeemCashModalProps> = ({
                   )}
                 </div>
 
-                {/* Merchant Name below QR as shown in image */}
+                {/* Merchant Name below QR */}
                 <div className="pt-1">
                   <div className="text-base font-bold text-white tracking-wide">
                     Jeevan M S
@@ -630,24 +609,68 @@ export const RedeemCashModal: React.FC<RedeemCashModalProps> = ({
                   </div>
                 </div>
 
-                {/* Quick Action Buttons for Mobile Users */}
-                <div className="flex items-center justify-center gap-2 pt-2 border-t border-slate-800/80">
-                  <button
-                    type="button"
-                    onClick={handleCopyUpi}
-                    className="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 hover:border-purple-500 text-xs text-purple-300 font-bold transition flex items-center gap-1.5"
-                  >
-                    {copiedUpi ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                    <span>{copiedUpi ? 'Copied UPI!' : 'Copy UPI ID'}</span>
-                  </button>
+                {/* UPI Options below the scanner */}
+                <div className="pt-2 border-t border-slate-800/80 space-y-2">
+                  <div className="text-[11px] font-extrabold text-purple-300 uppercase tracking-wider">
+                    UPI Options — Tap below to redirect to app:
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        audioHaptics.playClick();
+                        window.location.href = upiPayString;
+                      }}
+                      className="py-2 px-2.5 rounded-xl bg-[#5f259f] text-white font-bold text-[11px] hover:bg-purple-700 transition flex items-center justify-center gap-1 shadow-sm"
+                    >
+                      <span>💜 PhonePe</span>
+                    </button>
 
-                  <a
-                    href={upiPayString}
-                    className="px-3.5 py-1.5 rounded-xl bg-[#5f259f] hover:bg-[#722ebc] text-white text-xs font-bold transition flex items-center gap-1.5 shadow-md"
-                  >
-                    <ExternalLink className="w-3.5 h-3.5" />
-                    <span>Open PhonePe App</span>
-                  </a>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        audioHaptics.playClick();
+                        window.location.href = upiPayString;
+                      }}
+                      className="py-2 px-2.5 rounded-xl bg-[#1a73e8] text-white font-bold text-[11px] hover:bg-blue-700 transition flex items-center justify-center gap-1 shadow-sm"
+                    >
+                      <span>🔵 GPay</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        audioHaptics.playClick();
+                        window.location.href = upiPayString;
+                      }}
+                      className="py-2 px-2.5 rounded-xl bg-[#00baf2] text-white font-bold text-[11px] hover:bg-sky-600 transition flex items-center justify-center gap-1 shadow-sm"
+                    >
+                      <span>📲 Paytm</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        audioHaptics.playClick();
+                        window.location.href = upiPayString;
+                      }}
+                      className="py-2 px-2.5 rounded-xl bg-emerald-600 text-white font-bold text-[11px] hover:bg-emerald-700 transition flex items-center justify-center gap-1 shadow-sm"
+                    >
+                      <span>⚡ BHIM / Any UPI</span>
+                    </button>
+                  </div>
+
+                  <div className="pt-1 flex justify-center">
+                    <button
+                      type="button"
+                      onClick={handleCopyUpi}
+                      className="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 hover:border-purple-500 text-xs text-purple-300 font-bold transition flex items-center gap-1.5"
+                    >
+                      {copiedUpi ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{copiedUpi ? 'Copied UPI!' : 'Copy Merchant UPI ID'}</span>
+                    </button>
+                  </div>
                 </div>
 
               </div>
