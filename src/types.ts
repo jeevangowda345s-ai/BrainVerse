@@ -66,6 +66,9 @@ export interface UserProfile {
   isReturningUser?: boolean;
   isGuest?: boolean;
   lastWheelSpinDate?: string;
+  createdAt?: string;
+  lastActiveAt?: string;
+  updatedAt?: string;
   aiRoadmap?: AIRoadmap;
   redemptionHistory?: RedemptionRecord[];
 }

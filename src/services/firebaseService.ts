@@ -74,12 +74,99 @@ export async function saveUserProfileToFirestore(user: UserProfile): Promise<voi
   if (!user.id) return;
   try {
     const userRef = doc(db, 'users', user.id);
+    const nowIso = new Date().toISOString();
     await setDoc(userRef, {
       ...user,
-      updatedAt: new Date().toISOString()
+      createdAt: user.createdAt || nowIso,
+      lastActiveAt: nowIso,
+      updatedAt: nowIso
     }, { merge: true });
   } catch (err) {
     console.error('Failed to save user profile to Firestore:', err);
+  }
+}
+
+// Subscribe to ALL Registered Users for Admin (Master Admin jeevangowda345s@gmail.com)
+export function subscribeToAllUsers(onUpdate: (users: UserProfile[]) => void) {
+  const usersRef = collection(db, 'users');
+  return onSnapshot(usersRef, (snapshot) => {
+    const userList: UserProfile[] = [];
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data();
+      userList.push({
+        ...DEFAULT_USER,
+        ...data,
+        id: docSnap.id,
+      } as UserProfile);
+    });
+    // Sort by latest active / updated / created date
+    userList.sort((a, b) => {
+      const timeA = new Date(a.lastActiveAt || a.updatedAt || a.createdAt || a.lastActiveDate || 0).getTime();
+      const timeB = new Date(b.lastActiveAt || b.updatedAt || b.createdAt || b.lastActiveDate || 0).getTime();
+      return timeB - timeA;
+    });
+    onUpdate(userList);
+  }, (err) => {
+    console.warn('Error subscribing to all users for admin:', err);
+  });
+}
+
+// Admin Update target user profile and balances in Firestore
+export async function adminUpdateUserProfileInFirestore(targetUserId: string, updates: Partial<UserProfile>): Promise<void> {
+  if (!targetUserId) return;
+  try {
+    const userRef = doc(db, 'users', targetUserId);
+    const nowIso = new Date().toISOString();
+    await setDoc(userRef, {
+      ...updates,
+      updatedAt: nowIso,
+      lastActiveAt: nowIso
+    }, { merge: true });
+  } catch (err) {
+    console.error('Failed to admin update user in Firestore:', err);
+  }
+}
+
+// Revoke PRO VIP status from ALL users EXCEPT master admin jeevangowda345s@gmail.com
+export async function revokeAllNonAdminProUsersFromFirestore(): Promise<number> {
+  const MASTER_ADMIN = 'jeevangowda345s@gmail.com';
+  try {
+    const usersRef = collection(db, 'users');
+    const snapshot = await getDocs(usersRef);
+    let revokedCount = 0;
+    const promises: Promise<void>[] = [];
+
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data();
+      const userEmail = (data.email || '').toLowerCase().trim();
+      const isMasterAdmin = userEmail === MASTER_ADMIN;
+
+      if (!isMasterAdmin && data.isPremium) {
+        revokedCount++;
+        const userRef = doc(db, 'users', docSnap.id);
+        promises.push(
+          setDoc(userRef, {
+            isPremium: false,
+            updatedAt: new Date().toISOString()
+          }, { merge: true })
+        );
+      } else if (isMasterAdmin && (!data.isPremium || !data.isAdmin)) {
+        const userRef = doc(db, 'users', docSnap.id);
+        promises.push(
+          setDoc(userRef, {
+            isPremium: true,
+            isAdmin: true,
+            updatedAt: new Date().toISOString()
+          }, { merge: true })
+        );
+      }
+    });
+
+    await Promise.all(promises);
+    return revokedCount;
+  } catch (err) {
+    console.error('Failed to revoke non-admin PRO VIP users in Firestore:', err);
+    return 0;
   }
 }
 

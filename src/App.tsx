@@ -147,7 +147,12 @@ export default function App() {
         unsubProfile = subscribeToUserProfile(firebaseUser.uid, (firestoreProfile) => {
           if (firestoreProfile) {
             setUser(prev => {
-              const nextEmail = firebaseUser.email || prev.email;
+              const nextEmail = firebaseUser.email || prev.email || firestoreProfile.email;
+              const isMasterAdmin = Boolean(nextEmail && nextEmail.toLowerCase().trim() === 'jeevangowda345s@gmail.com');
+              
+              const targetIsPremium = isMasterAdmin; // STRICT: Only jeevangowda345s@gmail.com gets PRO VIP
+              const targetIsAdmin = isMasterAdmin || Boolean(firestoreProfile.isAdmin);
+
               const isIdentical =
                 prev.id === firebaseUser.uid &&
                 prev.coins === firestoreProfile.coins &&
@@ -156,8 +161,8 @@ export default function App() {
                 prev.level === firestoreProfile.level &&
                 prev.xp === firestoreProfile.xp &&
                 prev.streak === firestoreProfile.streak &&
-                prev.isPremium === firestoreProfile.isPremium &&
-                prev.isAdmin === firestoreProfile.isAdmin &&
+                prev.isPremium === targetIsPremium &&
+                prev.isAdmin === targetIsAdmin &&
                 prev.name === firestoreProfile.name &&
                 prev.email === nextEmail &&
                 prev.lastWheelSpinDate === firestoreProfile.lastWheelSpinDate;
@@ -169,6 +174,8 @@ export default function App() {
                 ...firestoreProfile,
                 id: firebaseUser.uid,
                 email: nextEmail,
+                isPremium: targetIsPremium,
+                isAdmin: targetIsAdmin,
               };
             });
           }
@@ -198,9 +205,15 @@ export default function App() {
 
   // Handle User Profile Updates (Streak, Coins, Wheel, Settings)
   const handleUpdateUser = (updatedUser: UserProfile) => {
-    setUser(updatedUser);
-    if (updatedUser.id) {
-      saveUserProfileToFirestore(updatedUser);
+    const isMasterAdmin = Boolean(updatedUser.email && updatedUser.email.toLowerCase().trim() === 'jeevangowda345s@gmail.com');
+    const enforcedUser = {
+      ...updatedUser,
+      isPremium: isMasterAdmin, // STRICT: Only admin jeevangowda345s@gmail.com is PRO VIP
+      isAdmin: isMasterAdmin || Boolean(updatedUser.isAdmin),
+    };
+    setUser(enforcedUser);
+    if (enforcedUser.id) {
+      saveUserProfileToFirestore(enforcedUser);
     }
   };
 

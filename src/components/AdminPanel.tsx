@@ -29,12 +29,29 @@ import {
   Sliders,
   CheckCircle,
   XCircle,
-  Clock
+  Clock,
+  Search,
+  Flame,
+  UserCheck,
+  Edit3,
+  Activity,
+  Calendar,
+  Shield,
+  Filter
 } from 'lucide-react';
 import { UserProfile, QRMerchantConfig, RedemptionRecord, ProUpgradeRequest } from '../types';
 import { audioHaptics } from '../utils/audioHaptics';
 import { loadQRMerchantConfig, saveQRMerchantConfig, saveUserProfile, loadProUpgradeRequests, saveProUpgradeRequest, DEFAULT_QR_CONFIG } from '../utils/storage';
-import { saveUserProfileToFirestore, fetchProUpgradeRequestsFromFirestore, updateProUpgradeRequestInFirestore, saveQRMerchantConfigToFirestore, fetchQRMerchantConfigFromFirestore } from '../services/firebaseService';
+import { 
+  saveUserProfileToFirestore, 
+  fetchProUpgradeRequestsFromFirestore, 
+  updateProUpgradeRequestInFirestore, 
+  saveQRMerchantConfigToFirestore, 
+  fetchQRMerchantConfigFromFirestore,
+  subscribeToAllUsers,
+  adminUpdateUserProfileInFirestore,
+  revokeAllNonAdminProUsersFromFirestore
+} from '../services/firebaseService';
 
 interface AdminPanelProps {
   user: UserProfile;
@@ -130,13 +147,56 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [qrSaveMsg, setQrSaveMsg] = useState<boolean>(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
-  // User Account Maintenance State
-  const [editingCoins, setEditingCoins] = useState<number>(user.coins || 0);
-  const [editingBrainScore, setEditingBrainScore] = useState<number>(user.brainScore || 0);
-  const [editingDiamonds, setEditingDiamonds] = useState<number>(user.diamonds || 0);
-  const [editingLevel, setEditingLevel] = useState<number>(user.level || 1);
-  const [editingIsPremium, setEditingIsPremium] = useState<boolean>(user.isPremium || false);
-  const [userSaveMsg, setUserSaveMsg] = useState<boolean>(false);
+  // All Registered Users Management State
+  const [allRegisteredUsers, setAllRegisteredUsers] = useState<UserProfile[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState<string>(user.id);
+  const [userSearchQuery, setUserSearchQuery] = useState<string>('');
+  const [userFilterRole, setUserFilterRole] = useState<'all' | 'pro' | 'admin'>('all');
+
+  // Active Target Selected User
+  const selectedUser = allRegisteredUsers.find(u => u.id === selectedUserId) || user;
+
+  // User Account Maintenance State for Target User
+  const [editingCoins, setEditingCoins] = useState<number>(selectedUser.coins || 0);
+  const [editingBrainScore, setEditingBrainScore] = useState<number>(selectedUser.brainScore || 0);
+  const [editingDiamonds, setEditingDiamonds] = useState<number>(selectedUser.diamonds || 0);
+  const [editingLevel, setEditingLevel] = useState<number>(selectedUser.level || 1);
+  const [editingStreak, setEditingStreak] = useState<number>(selectedUser.streak || 1);
+  const [editingXp, setEditingXp] = useState<number>(selectedUser.xp || 0);
+  const [editingIsPremium, setEditingIsPremium] = useState<boolean>(Boolean(selectedUser.isPremium));
+  const [editingIsAdmin, setEditingIsAdmin] = useState<boolean>(Boolean(selectedUser.isAdmin));
+  const [userSaveMsg, setUserSaveMsg] = useState<string | null>(null);
+
+  // Subscribe to ALL users in real time & purge non-admin PRO VIP status
+  useEffect(() => {
+    let unsub: (() => void) | null = null;
+    if (isAdminUnlocked) {
+      unsub = subscribeToAllUsers((userList) => {
+        setAllRegisteredUsers(userList);
+      });
+      // Automatically enforce PRO VIP removal for non-admins in Firestore
+      revokeAllNonAdminProUsersFromFirestore().catch(e => console.warn(e));
+    }
+    return () => {
+      if (unsub) unsub();
+    };
+  }, [isAdminUnlocked]);
+
+  // Sync edit state whenever selected target user changes or user list updates
+  useEffect(() => {
+    const target = allRegisteredUsers.find(u => u.id === selectedUserId) || user;
+    if (target) {
+      const isTargetMaster = Boolean(target.email && target.email.toLowerCase().trim() === MASTER_ADMIN_EMAIL.toLowerCase());
+      setEditingCoins(target.coins || 0);
+      setEditingBrainScore(target.brainScore || 0);
+      setEditingDiamonds(target.diamonds || 0);
+      setEditingLevel(target.level || 1);
+      setEditingStreak(target.streak || 1);
+      setEditingXp(target.xp || 0);
+      setEditingIsPremium(isTargetMaster); // STRICT: Only master admin can be PRO VIP
+      setEditingIsAdmin(isTargetMaster || Boolean(target.isAdmin));
+    }
+  }, [selectedUserId, allRegisteredUsers, user]);
 
   // Redemption History Management
   const [redemptions, setRedemptions] = useState<RedemptionRecord[]>(user.redemptionHistory || []);
@@ -148,19 +208,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [broadcastText, setBroadcastText] = useState<string>('');
   const [broadcastSent, setBroadcastSent] = useState<boolean>(false);
   const [aiTemp, setAiTemp] = useState<number>(0.7);
-
-  // Sync state if user changes
-  useEffect(() => {
-    setEditingCoins(user.coins || 0);
-    setEditingBrainScore(user.brainScore || 0);
-    setEditingDiamonds(user.diamonds || 0);
-    setEditingLevel(user.level || 1);
-    setEditingIsPremium(user.isPremium || false);
-    setRedemptions(user.redemptionHistory || []);
-    if (user.isAdmin || isMasterAdminEmail) {
-      setIsAdminUnlocked(true);
-    }
-  }, [user, isMasterAdminEmail]);
 
   // Unlock Admin Access strictly via master email authentication
   const handleUnlockAdmin = () => {
@@ -219,39 +266,64 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     saveQRMerchantConfigToFirestore(DEFAULT_QR_CONFIG).catch(e => console.warn(e));
   };
 
-  // Save User Balance & Account Updates
-  const handleSaveUserAccount = () => {
-    const updatedUser: UserProfile = {
-      ...user,
+  // Save Selected User Balance & Account Updates to Firestore
+  const handleSaveUserAccount = async () => {
+    const target = allRegisteredUsers.find(u => u.id === selectedUserId) || selectedUser;
+    if (!target || !target.id) return;
+
+    const isTargetMaster = Boolean(target.email && target.email.toLowerCase().trim() === MASTER_ADMIN_EMAIL.toLowerCase());
+
+    const updatedFields: Partial<UserProfile> = {
       coins: editingCoins,
       brainScore: editingBrainScore,
       diamonds: editingDiamonds,
       level: editingLevel,
-      isPremium: editingIsPremium,
-      isAdmin: true,
+      streak: editingStreak,
+      xp: editingXp,
+      isPremium: isTargetMaster, // STRICT: Only jeevangowda345s@gmail.com is PRO VIP
+      isAdmin: isTargetMaster || editingIsAdmin,
     };
 
-    if (onUpdateUser) onUpdateUser(updatedUser);
-    saveUserProfile(updatedUser);
-    saveUserProfileToFirestore(updatedUser).catch(e => console.warn(e));
+    // Save directly to Firestore for target user
+    await adminUpdateUserProfileInFirestore(target.id, updatedFields);
+
+    // If target is current logged-in session user, update local session as well
+    if (target.id === user.id) {
+      const updatedUser = { ...user, ...updatedFields };
+      if (onUpdateUser) onUpdateUser(updatedUser);
+      saveUserProfile(updatedUser);
+    }
 
     audioHaptics.playFanfare();
     audioHaptics.triggerHaptic('levelUp');
-    setUserSaveMsg(true);
-    setTimeout(() => setUserSaveMsg(false), 3000);
+    setUserSaveMsg(`Account & Balances Updated Successfully for "${target.name || 'User'}"!`);
+    setTimeout(() => setUserSaveMsg(null), 3500);
   };
 
-  const handleResetWheelSpinLock = () => {
-    const updatedUser: UserProfile = {
-      ...user,
-      lastWheelSpinDate: '',
-    };
-    if (onUpdateUser) onUpdateUser(updatedUser);
-    saveUserProfile(updatedUser);
-    saveUserProfileToFirestore(updatedUser).catch(e => console.warn(e));
+  // Manual Purge button action for Admin
+  const handlePurgeAllNonAdminProUsers = async () => {
+    audioHaptics.playClick();
+    const revokedCount = await revokeAllNonAdminProUsersFromFirestore();
+    audioHaptics.playFanfare();
+    audioHaptics.triggerHaptic('success');
+    setUserSaveMsg(`PRO VIP Access Enforced: Removed PRO VIP status from ${revokedCount} non-admin users. Only Master Admin (${MASTER_ADMIN_EMAIL}) is PRO VIP.`);
+    setTimeout(() => setUserSaveMsg(null), 4500);
+  };
+
+  const handleResetWheelSpinLock = async () => {
+    const target = allRegisteredUsers.find(u => u.id === selectedUserId) || selectedUser;
+    if (!target || !target.id) return;
+
+    await adminUpdateUserProfileInFirestore(target.id, { lastWheelSpinDate: '' });
+
+    if (target.id === user.id) {
+      const updatedUser = { ...user, lastWheelSpinDate: '' };
+      if (onUpdateUser) onUpdateUser(updatedUser);
+      saveUserProfile(updatedUser);
+    }
 
     audioHaptics.playFanfare();
-    alert('Daily Wheel Spin lock cleared! Daily spin re-enabled.');
+    alert(`Daily Wheel Spin lock cleared for ${target.name}! User can now spin again.`);
   };
 
   // Redemption Status Update
@@ -775,139 +847,406 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         </div>
       )}
 
-      {/* TAB 2: USER ACCOUNTS & BALANCE MANAGER */}
+      {/* TAB 2: REGISTERED USERS DIRECTORY & LIVE BALANCE EDITOR */}
       {activeAdminTab === 'users' && (
         <div className="p-6 rounded-3xl bg-slate-900 border border-slate-800 space-y-6 shadow-xl">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+          
+          {/* Section Header */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-800 pb-4 gap-4">
             <div>
               <h2 className="text-lg font-black text-white flex items-center gap-2">
                 <Users className="w-5 h-5 text-cyan-400" />
-                User Account Maintenance & Balance Editor
+                Master User Directory & Balance Control Center
               </h2>
               <p className="text-xs text-slate-400 mt-0.5">
-                Maintain user balances, grant coins, brain score, diamonds, levels, and toggle admin/premium status.
+                Real-time registry of all users, active status, login history, and live balance editor (Restricted to <span className="text-amber-400 font-mono font-bold">jeevangowda345s@gmail.com</span>).
               </p>
             </div>
-            <div className="px-3 py-1 rounded-full bg-cyan-950 border border-cyan-800 text-cyan-300 text-xs font-mono font-bold">
-              Editing: {user.name} ({user.email || 'Guest User'})
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={handlePurgeAllNonAdminProUsers}
+                className="px-3.5 py-1.5 rounded-xl bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 text-red-300 text-xs font-black uppercase transition flex items-center gap-1.5 shadow-md shadow-red-500/10"
+                title="Remove PRO VIP status from all non-admin users in Firestore"
+              >
+                <XCircle className="w-4 h-4 text-red-400" /> Remove All Non-Admin PRO VIPs
+              </button>
+              <span className="px-3 py-1.5 rounded-xl bg-cyan-950 border border-cyan-800 text-cyan-300 text-xs font-mono font-bold flex items-center gap-1.5">
+                <Users className="w-3.5 h-3.5 text-cyan-400" />
+                {allRegisteredUsers.length} Registered User{allRegisteredUsers.length !== 1 ? 's' : ''}
+              </span>
             </div>
           </div>
 
-          <div className="space-y-6">
-            
-            {/* Balance Editor Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+          {/* Active Target Selected User Box */}
+          <div className="p-5 rounded-2xl bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border border-cyan-500/30 space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-slate-800 border border-cyan-500/40 flex items-center justify-center text-2xl shadow-inner overflow-hidden">
+                  {selectedUser.avatar?.startsWith('data:') || selectedUser.avatar?.startsWith('http') ? (
+                    <img src={selectedUser.avatar} alt="Avatar" className="w-full h-full object-cover" />
+                  ) : (
+                    <span>{selectedUser.avatar || '🧠'}</span>
+                  )}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-base font-black text-white">{selectedUser.name || 'Unnamed User'}</span>
+                    {selectedUser.isPremium && (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-black bg-gradient-to-r from-amber-400 to-amber-600 text-slate-950 uppercase">PRO VIP</span>
+                    )}
+                    {selectedUser.isAdmin && (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-black bg-purple-500/20 text-purple-300 border border-purple-500/40 uppercase">ADMIN</span>
+                    )}
+                  </div>
+                  <div className="text-xs text-slate-400 font-mono flex items-center gap-2 mt-0.5">
+                    <span>{selectedUser.email || 'No Email (Guest)'}</span>
+                    <span className="text-slate-600">•</span>
+                    <span className="text-[10px] text-cyan-400">ID: {selectedUser.id}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="text-right text-[11px] font-mono text-slate-400 space-y-0.5">
+                <div><span className="text-slate-500">Registered:</span> {selectedUser.createdAt ? new Date(selectedUser.createdAt).toLocaleString() : 'Earlier Session'}</div>
+                <div><span className="text-slate-500">Last Active:</span> <span className="text-emerald-400 font-bold">{selectedUser.lastActiveAt ? new Date(selectedUser.lastActiveAt).toLocaleString() : (selectedUser.lastActiveDate || 'Just now')}</span></div>
+              </div>
+            </div>
+
+            {/* Editable Fields Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
               
-              {/* Coins Input */}
-              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
-                <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-                  <Coins className="w-4 h-4 text-amber-400" /> Brain Coins Balance
+              {/* Brain Coins */}
+              <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-1.5">
+                <label className="text-[11px] font-bold text-slate-300 flex items-center gap-1">
+                  <Coins className="w-3.5 h-3.5 text-amber-400" /> Brain Coins
                 </label>
                 <input
                   type="number"
                   value={editingCoins}
                   onChange={(e) => setEditingCoins(Number(e.target.value))}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-sm font-mono font-bold text-amber-400 focus:outline-none"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-amber-400 focus:outline-none focus:border-amber-400"
                 />
               </div>
 
-              {/* Brain Score Input */}
-              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
-                <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-                  <Zap className="w-4 h-4 text-cyan-400" /> Brain Score
+              {/* Brain Score */}
+              <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-1.5">
+                <label className="text-[11px] font-bold text-slate-300 flex items-center gap-1">
+                  <Zap className="w-3.5 h-3.5 text-cyan-400" /> Brain Score
                 </label>
                 <input
                   type="number"
                   value={editingBrainScore}
                   onChange={(e) => setEditingBrainScore(Number(e.target.value))}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-sm font-mono font-bold text-cyan-300 focus:outline-none"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-cyan-300 focus:outline-none focus:border-cyan-400"
                 />
               </div>
 
-              {/* Diamonds Input */}
-              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
-                <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-                  <Sparkles className="w-4 h-4 text-pink-400" /> Diamonds
+              {/* Diamonds */}
+              <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-1.5">
+                <label className="text-[11px] font-bold text-slate-300 flex items-center gap-1">
+                  <Sparkles className="w-3.5 h-3.5 text-pink-400" /> Diamonds
                 </label>
                 <input
                   type="number"
                   value={editingDiamonds}
                   onChange={(e) => setEditingDiamonds(Number(e.target.value))}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-sm font-mono font-bold text-pink-400 focus:outline-none"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-pink-400 focus:outline-none focus:border-pink-400"
                 />
               </div>
 
-              {/* Level Input */}
-              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
-                <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-                  <Crown className="w-4 h-4 text-purple-400" /> User Level
+              {/* User Level */}
+              <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-1.5">
+                <label className="text-[11px] font-bold text-slate-300 flex items-center gap-1">
+                  <Crown className="w-3.5 h-3.5 text-purple-400" /> Level
                 </label>
                 <input
                   type="number"
                   value={editingLevel}
                   onChange={(e) => setEditingLevel(Number(e.target.value))}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-sm font-mono font-bold text-purple-300 focus:outline-none"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-purple-300 focus:outline-none focus:border-purple-400"
+                />
+              </div>
+
+              {/* Streak Days */}
+              <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-1.5">
+                <label className="text-[11px] font-bold text-slate-300 flex items-center gap-1">
+                  <Flame className="w-3.5 h-3.5 text-orange-400" /> Streak Days
+                </label>
+                <input
+                  type="number"
+                  value={editingStreak}
+                  onChange={(e) => setEditingStreak(Number(e.target.value))}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-orange-400 focus:outline-none focus:border-orange-400"
+                />
+              </div>
+
+              {/* XP Points */}
+              <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-1.5">
+                <label className="text-[11px] font-bold text-slate-300 flex items-center gap-1">
+                  <Zap className="w-3.5 h-3.5 text-emerald-400" /> XP Points
+                </label>
+                <input
+                  type="number"
+                  value={editingXp}
+                  onChange={(e) => setEditingXp(Number(e.target.value))}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-emerald-400 focus:outline-none focus:border-emerald-400"
                 />
               </div>
 
             </div>
 
-            {/* Status Switches & Daily Spin Reset */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              
-              {/* Premium Toggle */}
-              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between">
-                <div>
-                  <div className="text-xs font-bold text-white flex items-center gap-1.5">
-                    <Crown className="w-4 h-4 text-amber-400" /> Premium Status
-                  </div>
-                  <div className="text-[10px] text-slate-400">Enable PRO benefits</div>
-                </div>
+            {/* Quick Balance Adders & Toggles */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <button
-                  onClick={() => setEditingIsPremium(!editingIsPremium)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
-                    editingIsPremium ? 'bg-amber-500 text-slate-950' : 'bg-slate-800 text-slate-400'
+                  type="button"
+                  onClick={() => setEditingCoins(prev => prev + 1000)}
+                  className="px-2.5 py-1 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-300 text-[11px] font-bold hover:bg-amber-500/30 transition"
+                >
+                  +1,000 Coins
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditingCoins(prev => prev + 10000)}
+                  className="px-2.5 py-1 rounded-lg bg-amber-500/25 border border-amber-500/40 text-amber-300 text-[11px] font-bold hover:bg-amber-500/40 transition"
+                >
+                  +10,000 Coins
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditingDiamonds(prev => prev + 50)}
+                  className="px-2.5 py-1 rounded-lg bg-pink-500/15 border border-pink-500/30 text-pink-300 text-[11px] font-bold hover:bg-pink-500/30 transition"
+                >
+                  +50 Diamonds
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditingBrainScore(prev => prev + 500)}
+                  className="px-2.5 py-1 rounded-lg bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 text-[11px] font-bold hover:bg-cyan-500/30 transition"
+                >
+                  +500 Brain Score
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditingLevel(100)}
+                  className="px-2.5 py-1 rounded-lg bg-purple-500/15 border border-purple-500/30 text-purple-300 text-[11px] font-bold hover:bg-purple-500/30 transition"
+                >
+                  Max Lvl 100
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const isMaster = Boolean(selectedUser.email && selectedUser.email.toLowerCase().trim() === MASTER_ADMIN_EMAIL.toLowerCase());
+                    if (!isMaster) {
+                      alert(`PRO VIP membership is strictly restricted to Master Admin (${MASTER_ADMIN_EMAIL}). All non-admin PRO access is disabled.`);
+                      setEditingIsPremium(false);
+                      return;
+                    }
+                    setEditingIsPremium(!editingIsPremium);
+                  }}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+                    editingIsPremium 
+                      ? 'bg-amber-500 text-slate-950 font-black shadow-lg shadow-amber-500/20' 
+                      : 'bg-slate-800 text-slate-400 border border-slate-700'
                   }`}
                 >
-                  {editingIsPremium ? 'PRO ACTIVE' : 'STANDARD'}
+                  <Crown className="w-3.5 h-3.5" />
+                  {editingIsPremium ? 'PRO VIP MEMBER' : 'PRO (ADMIN ONLY)'}
                 </button>
-              </div>
 
-              {/* Reset Daily Wheel Spin */}
-              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between">
-                <div>
-                  <div className="text-xs font-bold text-white flex items-center gap-1.5">
-                    <RotateCw className="w-4 h-4 text-cyan-400" /> Daily Wheel Spin Lock
-                  </div>
-                  <div className="text-[10px] text-slate-400">Unlock unlimited spins</div>
-                </div>
                 <button
+                  type="button"
                   onClick={handleResetWheelSpinLock}
-                  className="px-3 py-1.5 rounded-xl bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 text-xs font-bold hover:bg-cyan-500/30 transition"
+                  className="px-3 py-1.5 rounded-xl bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 text-xs font-bold hover:bg-cyan-500/30 transition flex items-center gap-1"
                 >
-                  Clear Lock
+                  <RotateCw className="w-3.5 h-3.5" /> Reset Spin Lock
                 </button>
-              </div>
 
-              {/* Save Button */}
-              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-center">
                 <button
+                  type="button"
                   onClick={handleSaveUserAccount}
-                  className="w-full py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 font-black text-xs uppercase shadow-lg hover:brightness-110 transition flex items-center justify-center gap-1.5"
+                  className="px-4 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 font-black text-xs uppercase shadow-lg shadow-emerald-500/25 hover:brightness-110 transition flex items-center gap-1.5"
                 >
-                  <Save className="w-4 h-4" /> Save User Account
+                  <Save className="w-3.5 h-3.5" /> Save Selected User
                 </button>
               </div>
-
             </div>
 
             {userSaveMsg && (
               <div className="p-3 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center justify-center gap-1.5 animate-bounce">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400" /> User Profile & Balances Updated Successfully!
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" /> {userSaveMsg}
               </div>
             )}
+          </div>
+
+          {/* All Registered Users Search & Directory Table */}
+          <div className="space-y-4">
+            
+            {/* Search & Filter Controls */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-950 p-3 rounded-2xl border border-slate-800">
+              <div className="relative w-full sm:w-80">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Search by name, email, or user ID..."
+                  value={userSearchQuery}
+                  onChange={(e) => setUserSearchQuery(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+                />
+              </div>
+
+              <div className="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
+                <button
+                  type="button"
+                  onClick={() => setUserFilterRole('all')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${
+                    userFilterRole === 'all'
+                      ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
+                      : 'text-slate-400 bg-slate-900 border border-slate-800 hover:text-white'
+                  }`}
+                >
+                  All ({allRegisteredUsers.length})
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setUserFilterRole('pro')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap flex items-center gap-1 ${
+                    userFilterRole === 'pro'
+                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                      : 'text-slate-400 bg-slate-900 border border-slate-800 hover:text-white'
+                  }`}
+                >
+                  <Crown className="w-3 h-3 text-amber-400" /> PRO VIP ({allRegisteredUsers.filter(u => u.isPremium).length})
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setUserFilterRole('admin')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap flex items-center gap-1 ${
+                    userFilterRole === 'admin'
+                      ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40'
+                      : 'text-slate-400 bg-slate-900 border border-slate-800 hover:text-white'
+                  }`}
+                >
+                  <Shield className="w-3 h-3 text-purple-400" /> Admins ({allRegisteredUsers.filter(u => u.isAdmin).length})
+                </button>
+              </div>
+            </div>
+
+            {/* Users Directory Cards / List */}
+            <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1 scrollbar-thin">
+              {allRegisteredUsers
+                .filter(u => {
+                  if (userFilterRole === 'pro' && !u.isPremium) return false;
+                  if (userFilterRole === 'admin' && !u.isAdmin) return false;
+                  if (userSearchQuery.trim()) {
+                    const q = userSearchQuery.toLowerCase().trim();
+                    const nameMatch = (u.name || '').toLowerCase().includes(q);
+                    const emailMatch = (u.email || '').toLowerCase().includes(q);
+                    const idMatch = (u.id || '').toLowerCase().includes(q);
+                    return nameMatch || emailMatch || idMatch;
+                  }
+                  return true;
+                })
+                .map((u) => {
+                  const isSelected = u.id === selectedUserId;
+                  return (
+                    <div
+                      key={u.id}
+                      onClick={() => setSelectedUserId(u.id)}
+                      className={`p-3.5 rounded-2xl border transition cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-3 ${
+                        isSelected
+                          ? 'bg-cyan-950/40 border-cyan-500/60 shadow-[0_0_15px_rgba(0,245,255,0.1)]'
+                          : 'bg-slate-950/70 border-slate-800/80 hover:bg-slate-900 hover:border-slate-700'
+                      }`}
+                    >
+                      {/* Left: User Avatar & Main Info */}
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center text-xl overflow-hidden shrink-0">
+                          {u.avatar?.startsWith('data:') || u.avatar?.startsWith('http') ? (
+                            <img src={u.avatar} alt="Avatar" className="w-full h-full object-cover" />
+                          ) : (
+                            <span>{u.avatar || '🧠'}</span>
+                          )}
+                        </div>
+
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-bold text-white">{u.name || 'Anonymous User'}</span>
+                            {u.isPremium && (
+                              <span className="px-1.5 py-0.2 rounded text-[9px] font-black bg-amber-400 text-slate-950 uppercase">PRO</span>
+                            )}
+                            {u.isAdmin && (
+                              <span className="px-1.5 py-0.2 rounded text-[9px] font-black bg-purple-500/20 text-purple-300 border border-purple-500/40 uppercase">ADMIN</span>
+                            )}
+                            {isSelected && (
+                              <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">SELECTED</span>
+                            )}
+                          </div>
+                          <div className="text-[11px] text-slate-400 font-mono flex items-center gap-2 mt-0.5">
+                            <span>{u.email || 'Guest User'}</span>
+                            <span className="text-slate-600">•</span>
+                            <span className="text-[10px] text-slate-500">ID: {u.id.substring(0, 10)}...</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Middle: Stats Summary */}
+                      <div className="flex items-center gap-3 font-mono text-xs">
+                        <div className="text-amber-400 font-bold flex items-center gap-1">
+                          <Coins className="w-3.5 h-3.5" /> {(u.coins || 0).toLocaleString()}
+                        </div>
+                        <div className="text-cyan-300 font-bold flex items-center gap-1">
+                          <Zap className="w-3.5 h-3.5" /> {(u.brainScore || 0).toLocaleString()}
+                        </div>
+                        <div className="text-pink-400 font-bold flex items-center gap-1">
+                          <Sparkles className="w-3.5 h-3.5" /> {u.diamonds || 0}
+                        </div>
+                        <div className="text-purple-300 font-bold">
+                          Lvl {u.level || 1}
+                        </div>
+                      </div>
+
+                      {/* Right: Registration & Active Dates + Edit Action */}
+                      <div className="flex items-center justify-between md:justify-end gap-3 border-t md:border-t-0 border-slate-800 pt-2 md:pt-0">
+                        <div className="text-right text-[10px] font-mono text-slate-400">
+                          <div>Reg: {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : 'Existing'}</div>
+                          <div className="text-emerald-400">Active: {u.lastActiveAt ? new Date(u.lastActiveAt).toLocaleDateString() : (u.lastActiveDate || 'Today')}</div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedUserId(u.id);
+                          }}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1 ${
+                            isSelected
+                              ? 'bg-cyan-500 text-slate-950 font-black'
+                              : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
+                          }`}
+                        >
+                          <Edit3 className="w-3 h-3" /> Edit Balances
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+
+              {allRegisteredUsers.length === 0 && (
+                <div className="p-8 text-center bg-slate-950 rounded-2xl border border-slate-800 text-slate-400 text-xs">
+                  Loading user registry from Firestore...
+                </div>
+              )}
+            </div>
 
           </div>
+
         </div>
       )}
 
