@@ -5,7 +5,8 @@ import {
   Achievement, 
   ThemeSettings, 
   GameSessionResult,
-  MultiplayerRoom
+  MultiplayerRoom,
+  QRMerchantConfig
 } from '../types';
 
 const USER_KEY = 'mindforge_user_profile_v2';
@@ -13,6 +14,17 @@ const THEME_KEY = 'mindforge_theme_settings_v2';
 const MISSIONS_KEY = 'mindforge_daily_missions_v2';
 const ACHIEVEMENTS_KEY = 'mindforge_achievements_v2';
 const SESSIONS_KEY = 'mindforge_game_sessions_v2';
+const QR_CONFIG_KEY = 'mindforge_qr_config_v2';
+
+export const DEFAULT_QR_CONFIG: QRMerchantConfig = {
+  upiId: 'jeevanms@ybl',
+  merchantName: 'Jeevan M S',
+  qrImageUrl: '',
+  wheelSpinFeeINR: 9,
+  redemptionFeeINR: 10,
+  freeSpinsForPremium: true,
+  freeSpinCoinsForPremium: 500,
+};
 
 export const INITIAL_GAMES: GameInfo[] = [
   {
@@ -516,4 +528,20 @@ export function saveGameSession(session: GameSessionResult) {
   const sessions = loadGameSessions();
   sessions.unshift(session);
   localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions.slice(0, 50)));
+}
+
+export function loadQRMerchantConfig(): QRMerchantConfig {
+  if (typeof window === 'undefined') return DEFAULT_QR_CONFIG;
+  const saved = localStorage.getItem(QR_CONFIG_KEY);
+  if (!saved) return DEFAULT_QR_CONFIG;
+  try {
+    return { ...DEFAULT_QR_CONFIG, ...JSON.parse(saved) };
+  } catch (e) {
+    return DEFAULT_QR_CONFIG;
+  }
+}
+
+export function saveQRMerchantConfig(config: QRMerchantConfig): void {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(QR_CONFIG_KEY, JSON.stringify(config));
 }

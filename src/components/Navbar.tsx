@@ -20,7 +20,8 @@ import {
   VolumeX,
   User,
   UserPlus,
-  LogOut
+  LogOut,
+  IndianRupee
 } from 'lucide-react';
 import { UserProfile, ThemeSettings } from '../types';
 import { audioHaptics } from '../utils/audioHaptics';
@@ -35,6 +36,7 @@ interface NavbarProps {
   onOpenAdmin: () => void;
   onOpenAuth: () => void;
   onSignOut: () => void;
+  onOpenRedeemCash: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -47,6 +49,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenAdmin,
   onOpenAuth,
   onSignOut,
+  onOpenRedeemCash,
 }) => {
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Brain },
@@ -56,12 +59,17 @@ export const Navbar: React.FC<NavbarProps> = ({
     { id: 'multiplayer', label: 'Multiplayer & Ranks', icon: Trophy },
     { id: 'missions', label: 'Missions & Rewards', icon: Gift },
     { id: 'lab', label: 'Brain Lab', icon: Sparkles, badge: 'New' },
+    { id: 'redeem', label: 'Redeem Cash ₹', icon: IndianRupee, badge: 'PhonePe' },
   ];
 
   const handleTabChange = (id: string) => {
     audioHaptics.playClick();
     audioHaptics.triggerHaptic('tap');
-    setActiveTab(id);
+    if (id === 'redeem') {
+      onOpenRedeemCash();
+    } else {
+      setActiveTab(id);
+    }
   };
 
   const themeCycle: Array<ThemeSettings['palette']> = [
@@ -168,10 +176,15 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <span>{user.brainScore}</span>
               </div>
               <div className="h-3 w-px bg-[#222222]" />
-              <div className="flex items-center gap-1 text-emerald-400 font-bold text-xs" title="MindForge Coins">
-                <Coins className="w-3.5 h-3.5 text-emerald-400" />
-                <span>{user.coins}</span>
-              </div>
+              <button 
+                onClick={onOpenRedeemCash} 
+                className="flex items-center gap-1 text-emerald-400 font-bold text-xs hover:text-emerald-300 transition" 
+                title="Click to Redeem Coins for Real Cash (₹)"
+              >
+                <Coins className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+                <span>{user.coins.toLocaleString()}</span>
+                <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 ml-0.5 font-bold">₹</span>
+              </button>
             </div>
 
             {/* Level Badge */}

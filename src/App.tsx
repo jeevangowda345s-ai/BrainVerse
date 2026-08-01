@@ -18,6 +18,7 @@ import { SettingsModal } from './components/SettingsModal';
 import { AuthModal } from './components/AuthModal';
 import { AuthScreen } from './components/AuthScreen';
 import { LevelUpModal } from './components/LevelUpModal';
+import { RedeemCashModal } from './components/RedeemCashModal';
 import { getRankForLevel } from './utils/ranks';
 
 // Mini Games
@@ -37,7 +38,8 @@ import {
   DailyMission,
   Achievement,
   GameSessionResult,
-  GameId
+  GameId,
+  RedemptionRecord
 } from './types';
 
 import {
@@ -85,8 +87,37 @@ export default function App() {
   const [showSettings, setShowSettings] = useState<boolean>(false);
   const [showAdminModal, setShowAdminModal] = useState<boolean>(false);
   const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
+  const [showRedeemCashModal, setShowRedeemCashModal] = useState<boolean>(false);
   const [unlockedToastAchievement, setUnlockedToastAchievement] = useState<Achievement | null>(null);
   const [levelUpModalState, setLevelUpModalState] = useState<{ isOpen: boolean; oldLevel: number; newLevel: number } | null>(null);
+
+  // Cash Redemption Handler
+  const handleRedeemSuccess = (record: RedemptionRecord, coinsDeducted: number) => {
+    setUser(prev => {
+      const updatedHistory = [record, ...(prev.redemptionHistory || [])];
+      const updatedUser = {
+        ...prev,
+        coins: Math.max(0, prev.coins - coinsDeducted),
+        redemptionHistory: updatedHistory,
+      };
+      saveUserProfile(updatedUser);
+      saveUserProfileToFirestore(updatedUser).catch(e => console.warn('Firestore redeem sync:', e));
+      return updatedUser;
+    });
+  };
+
+  // Quick Add Test Coins Handler
+  const handleAddTestCoins = (amount: number) => {
+    setUser(prev => {
+      const updatedUser = {
+        ...prev,
+        coins: (prev.coins || 0) + amount,
+      };
+      saveUserProfile(updatedUser);
+      saveUserProfileToFirestore(updatedUser).catch(e => console.warn('Firestore coins sync:', e));
+      return updatedUser;
+    });
+  };
 
   // Level Up Trigger Handler
   const triggerLevelUp = (oldLevel: number, newLevel: number) => {
@@ -122,12 +153,31 @@ export default function App() {
         if (unsubProfile) unsubProfile();
         unsubProfile = subscribeToUserProfile(firebaseUser.uid, (firestoreProfile) => {
           if (firestoreProfile) {
-            setUser(prev => ({
-              ...prev,
-              ...firestoreProfile,
-              id: firebaseUser.uid,
-              email: firebaseUser.email || prev.email,
-            }));
+            setUser(prev => {
+              const nextEmail = firebaseUser.email || prev.email;
+              const isIdentical =
+                prev.id === firebaseUser.uid &&
+                prev.coins === firestoreProfile.coins &&
+                prev.brainScore === firestoreProfile.brainScore &&
+                prev.diamonds === firestoreProfile.diamonds &&
+                prev.level === firestoreProfile.level &&
+                prev.xp === firestoreProfile.xp &&
+                prev.streak === firestoreProfile.streak &&
+                prev.isPremium === firestoreProfile.isPremium &&
+                prev.isAdmin === firestoreProfile.isAdmin &&
+                prev.name === firestoreProfile.name &&
+                prev.email === nextEmail &&
+                prev.lastWheelSpinDate === firestoreProfile.lastWheelSpinDate;
+
+              if (isIdentical) return prev;
+
+              return {
+                ...prev,
+                ...firestoreProfile,
+                id: firebaseUser.uid,
+                email: nextEmail,
+              };
+            });
           }
         });
       } else {
@@ -161,12 +211,9 @@ export default function App() {
     }
   };
 
-  // Sync to local storage & Firestore backup
+  // Sync user state to local storage
   useEffect(() => {
     saveUserProfile(user);
-    if (user.id) {
-      saveUserProfileToFirestore(user);
-    }
   }, [user]);
 
   useEffect(() => {
@@ -242,7 +289,8 @@ export default function App() {
     confetti({ particleCount: 60, spread: 70, origin: { y: 0.6 } });
 
     const xpGained = Math.max(20, Math.round(score / 2));
-    const coinsGained = Math.max(15, Math.round(score / 10));
+    // Max 100 coins received if any game wins
+    const coinsGained = Math.min(100, Math.max(10, Math.round(score / 10)));
 
     const categoryRatingKey: keyof UserProfile['ratings'] = 
       activeGameId === 'memory_matrix' || activeGameId === 'color_shape_memory' ? 'memory'
@@ -435,6 +483,7 @@ export default function App() {
         onOpenAdmin={() => setShowAdminModal(true)}
         onOpenAuth={() => setShowAuthModal(true)}
         onSignOut={handleSignOut}
+        onOpenRedeemCash={() => setShowRedeemCashModal(true)}
       />
 
       {/* Main View Area */}
@@ -477,6 +526,7 @@ export default function App() {
             onClaimWheelReward={handleClaimWheelReward}
             onTestTriggerToast={(ach) => setUnlockedToastAchievement(ach)}
             onTestLevelUp={() => triggerLevelUp(user.level || 1, (user.level || 1) + 1)}
+            onOpenRedeemCash={() => setShowRedeemCashModal(true)}
           />
         )}
 
@@ -542,7 +592,12 @@ export default function App() {
             >
               ✕
             </button>
-            <AdminPanel user={user} />
+            <AdminPanel 
+              user={user}
+              onUpdateUser={(updated) => setUser(updated)}
+              onUpdateCoins={handleUpdateCoins}
+              onClose={() => setShowAdminModal(false)}
+            />
           </div>
         </div>
       )}
@@ -563,6 +618,15 @@ export default function App() {
           onClose={() => setLevelUpModalState(null)}
         />
       )}
+
+      {/* Real Cash Redemption Modal & PhonePe Scanner */}
+      <RedeemCashModal
+        isOpen={showRedeemCashModal}
+        onClose={() => setShowRedeemCashModal(false)}
+        user={user}
+        onRedeemSuccess={handleRedeemSuccess}
+        onAddTestCoins={handleAddTestCoins}
+      />
 
     </div>
   );

@@ -61,11 +61,40 @@ export interface UserProfile {
   badges: string[];
   unlockedCosmetics: string[];
   isPremium: boolean;
+  isAdmin?: boolean;
   isOnboarded: boolean;
   isReturningUser?: boolean;
   isGuest?: boolean;
   lastWheelSpinDate?: string;
   aiRoadmap?: AIRoadmap;
+  redemptionHistory?: RedemptionRecord[];
+}
+
+export interface QRMerchantConfig {
+  upiId: string;
+  merchantName: string;
+  qrImageUrl?: string;
+  wheelSpinFeeINR: number;
+  redemptionFeeINR: number;
+  freeSpinsForPremium: boolean;
+  freeSpinCoinsForPremium: number;
+}
+
+export interface RedemptionRecord {
+  id: string;
+  userId: string;
+  userName: string;
+  coinsRedeemed: number;
+  inrAmount: number;
+  paymentMethod: 'upi' | 'bank' | 'voucher';
+  payoutDestination: string;
+  feePaidAmount: number;
+  utrNumber: string;
+  screenshotUrl?: string;
+  status: 'PENDING_VERIFICATION' | 'FEE_RECEIVED' | 'PROCESSING_PAYOUT' | 'SUCCESS' | 'REJECTED';
+  timestamp: string;
+  estimatedDelivery: string;
+  notes?: string;
 }
 
 export interface AIRoadmap {
