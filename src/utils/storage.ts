@@ -19,13 +19,17 @@ const QR_CONFIG_KEY = 'mindforge_qr_config_v2';
 
 export const DEFAULT_QR_CONFIG: QRMerchantConfig = {
   upiId: 'jeevanms@ybl',
-  merchantName: 'Jeevan M S',
+  merchantName: 'MindForge Technologies India Ltd (Jeevan M S)',
   qrImageUrl: '',
   wheelSpinFeeINR: 9,
   redemptionFeeINR: 10,
   premiumFeeINR: 99,
   freeSpinsForPremium: true,
   freeSpinCoinsForPremium: 500,
+  gstin: '29AAACM2026M1Z8',
+  officialEmail: 'payments@mindforge.app',
+  businessAddress: 'MindForge Tech Park, Suite 402, Outer Ring Road, Bengaluru, KA 560103',
+  verifiedMerchantSeal: true,
 };
 
 export const INITIAL_GAMES: GameInfo[] = [

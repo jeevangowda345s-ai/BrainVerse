@@ -444,7 +444,7 @@ export const GamificationHub: React.FC<GamificationHubProps> = ({
               <div className="p-4 rounded-2xl bg-purple-950/30 border border-purple-500/30 text-center space-y-1">
                 <div className="text-xs text-purple-300 font-bold uppercase tracking-wider">Lucky Wheel Fee</div>
                 <div className="text-3xl font-black text-amber-400 font-mono">
-                  ₹9.00 <span className="text-xs text-slate-300 font-sans font-normal">INR</span>
+                  ₹{SPIN_FEE_INR}.00 <span className="text-xs text-slate-300 font-sans font-normal">INR</span>
                 </div>
                 <div className="text-xs text-slate-300 pt-1">
                   Merchant: <strong className="text-white">{MERCHANT_NAME}</strong> ({UPI_ID})

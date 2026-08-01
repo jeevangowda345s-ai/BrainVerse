@@ -346,28 +346,38 @@ export const PremiumMembershipModal: React.FC<PremiumMembershipModalProps> = ({
 
             {/* Merchant Details & Copy Actions */}
             <div className="space-y-3 text-xs">
-              <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-1">
-                <span className="text-slate-400 text-[10px]">Merchant Name:</span>
-                <div className="font-bold text-white text-sm">{merchantName}</div>
+              <div className="p-3.5 rounded-2xl bg-slate-900 border border-slate-800 space-y-1.5 relative overflow-hidden">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Official Merchant Name</span>
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[9px] font-black uppercase tracking-wider flex items-center gap-1">
+                    <ShieldCheck className="w-3 h-3 text-emerald-400" /> NPCI Verified
+                  </span>
+                </div>
+                <div className="font-black text-white text-sm">{merchantName}</div>
+                {qrConfig.gstin && (
+                  <div className="text-[10px] text-slate-400 font-mono">
+                    GSTIN / Reg ID: <span className="text-cyan-300 font-bold">{qrConfig.gstin}</span>
+                  </div>
+                )}
               </div>
 
-              <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-1">
+              <div className="p-3.5 rounded-2xl bg-slate-900 border border-amber-500/30 space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-400 text-[10px]">Merchant UPI ID:</span>
+                  <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Merchant UPI ID</span>
                   <button
                     onClick={handleCopyUpi}
                     className="text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1 text-[10px]"
                   >
                     {copiedUpi ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                    <span>{copiedUpi ? 'Copied' : 'Copy UPI'}</span>
+                    <span>{copiedUpi ? 'Copied' : 'Copy UPI ID'}</span>
                   </button>
                 </div>
-                <div className="font-mono font-bold text-amber-400 text-sm">{merchantUpi}</div>
+                <div className="font-mono font-black text-amber-400 text-sm tracking-wide">{merchantUpi}</div>
               </div>
 
-              <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-1">
+              <div className="p-3.5 rounded-2xl bg-slate-900 border border-emerald-500/30 space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-400 text-[10px]">Exact Amount:</span>
+                  <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Itemized Bill Total</span>
                   <button
                     onClick={handleCopyAmount}
                     className="text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1 text-[10px]"
@@ -376,8 +386,28 @@ export const PremiumMembershipModal: React.FC<PremiumMembershipModalProps> = ({
                     <span>{copiedAmount ? 'Copied' : `Copy ₹${MEMBERSHIP_FEE_INR}`}</span>
                   </button>
                 </div>
-                <div className="font-mono font-bold text-emerald-400 text-sm">₹{MEMBERSHIP_FEE_INR}.00 INR</div>
+                
+                <div className="space-y-1 text-[11px] pt-1 border-t border-slate-800/80">
+                  <div className="flex justify-between text-slate-400">
+                    <span>Base Membership Fee</span>
+                    <span className="font-mono">₹{MEMBERSHIP_FEE_INR}.00</span>
+                  </div>
+                  <div className="flex justify-between text-slate-400">
+                    <span>Platform Service Charge</span>
+                    <span className="font-mono text-emerald-400 font-bold">FREE (₹0.00)</span>
+                  </div>
+                  <div className="flex justify-between text-slate-300 font-bold pt-1 border-t border-slate-800">
+                    <span>Total Net Payable</span>
+                    <span className="font-mono text-emerald-400 text-sm">₹{MEMBERSHIP_FEE_INR}.00 INR</span>
+                  </div>
+                </div>
               </div>
+
+              {qrConfig.officialEmail && (
+                <div className="text-[10px] text-slate-400 text-center">
+                  Official Billing Support: <span className="text-slate-200 font-mono">{qrConfig.officialEmail}</span>
+                </div>
+              )}
             </div>
 
           </div>

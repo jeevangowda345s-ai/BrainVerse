@@ -16,7 +16,7 @@ import {
   increment,
   where
 } from '../lib/firebase';
-import { UserProfile, GameSessionResult, ProUpgradeRequest } from '../types';
+import { UserProfile, GameSessionResult, ProUpgradeRequest, QRMerchantConfig } from '../types';
 import { DEFAULT_USER } from '../utils/storage';
 
 export interface PublicActivityItem {
@@ -418,4 +418,31 @@ export async function updateProUpgradeRequestInFirestore(
   } catch (err) {
     console.error('Error updating PRO request status in Firestore:', err);
   }
+}
+
+// Save or Update Merchant QR & Payment Config in Firestore
+export async function saveQRMerchantConfigToFirestore(config: QRMerchantConfig): Promise<void> {
+  try {
+    const docRef = doc(db, 'system_config', 'merchant_qr');
+    await setDoc(docRef, {
+      ...config,
+      updatedAt: new Date().toISOString()
+    }, { merge: true });
+  } catch (err) {
+    console.error('Error saving merchant QR config to Firestore:', err);
+  }
+}
+
+// Fetch Official Merchant QR & Payment Config from Firestore
+export async function fetchQRMerchantConfigFromFirestore(): Promise<QRMerchantConfig | null> {
+  try {
+    const docRef = doc(db, 'system_config', 'merchant_qr');
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      return snap.data() as QRMerchantConfig;
+    }
+  } catch (err) {
+    console.warn('Error fetching merchant QR config from Firestore:', err);
+  }
+  return null;
 }

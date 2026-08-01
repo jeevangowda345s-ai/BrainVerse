@@ -34,7 +34,7 @@ import {
 import { UserProfile, QRMerchantConfig, RedemptionRecord, ProUpgradeRequest } from '../types';
 import { audioHaptics } from '../utils/audioHaptics';
 import { loadQRMerchantConfig, saveQRMerchantConfig, saveUserProfile, loadProUpgradeRequests, saveProUpgradeRequest, DEFAULT_QR_CONFIG } from '../utils/storage';
-import { saveUserProfileToFirestore, fetchProUpgradeRequestsFromFirestore, updateProUpgradeRequestInFirestore } from '../services/firebaseService';
+import { saveUserProfileToFirestore, fetchProUpgradeRequestsFromFirestore, updateProUpgradeRequestInFirestore, saveQRMerchantConfigToFirestore, fetchQRMerchantConfigFromFirestore } from '../services/firebaseService';
 
 interface AdminPanelProps {
   user: UserProfile;
@@ -204,6 +204,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   // Save QR Merchant Config
   const handleSaveQRConfig = () => {
     saveQRMerchantConfig(qrConfig);
+    saveQRMerchantConfigToFirestore(qrConfig).catch(e => console.warn(e));
     audioHaptics.playFanfare();
     audioHaptics.triggerHaptic('heavy');
     setQrSaveMsg(true);
@@ -215,6 +216,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     audioHaptics.playClick();
     setQrConfig(DEFAULT_QR_CONFIG);
     saveQRMerchantConfig(DEFAULT_QR_CONFIG);
+    saveQRMerchantConfigToFirestore(DEFAULT_QR_CONFIG).catch(e => console.warn(e));
   };
 
   // Save User Balance & Account Updates
@@ -672,12 +674,35 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-300">Merchant Name</label>
+                  <label className="text-xs font-bold text-slate-300">Official Merchant Name</label>
                   <input
                     type="text"
                     value={qrConfig.merchantName}
                     onChange={(e) => setQrConfig(prev => ({ ...prev, merchantName: e.target.value }))}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs font-bold text-white focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Official GSTIN & Support Email */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-300">Official GSTIN / Business ID</label>
+                  <input
+                    type="text"
+                    value={qrConfig.gstin || '29AAACM2026M1Z8'}
+                    onChange={(e) => setQrConfig(prev => ({ ...prev, gstin: e.target.value }))}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs font-mono text-cyan-300 focus:outline-none"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-300">Official Support Email</label>
+                  <input
+                    type="email"
+                    value={qrConfig.officialEmail || 'payments@mindforge.app'}
+                    onChange={(e) => setQrConfig(prev => ({ ...prev, officialEmail: e.target.value }))}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-200 focus:outline-none"
                   />
                 </div>
               </div>
