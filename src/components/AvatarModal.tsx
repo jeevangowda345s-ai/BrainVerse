@@ -34,6 +34,15 @@ export const AvatarModal: React.FC<AvatarModalProps> = ({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
 
+  const stopCamera = () => {
+    if (videoRef.current && videoRef.current.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      stream.getTracks().forEach((track) => track.stop());
+      videoRef.current.srcObject = null;
+    }
+    setIsCameraActive(false);
+  };
+
   useEffect(() => {
     if (isOpen) {
       setSelectedAvatar(user.avatar || '🧠');
@@ -41,9 +50,10 @@ export const AvatarModal: React.FC<AvatarModalProps> = ({
     } else {
       stopCamera();
     }
+    return () => {
+      stopCamera();
+    };
   }, [isOpen, user.avatar]);
-
-  if (!isOpen) return null;
 
   // Start Camera Stream
   const startCamera = async () => {
@@ -69,15 +79,7 @@ export const AvatarModal: React.FC<AvatarModalProps> = ({
     }
   };
 
-  // Stop Camera Stream
-  const stopCamera = () => {
-    if (videoRef.current && videoRef.current.srcObject) {
-      const stream = videoRef.current.srcObject as MediaStream;
-      stream.getTracks().forEach((track) => track.stop());
-      videoRef.current.srcObject = null;
-    }
-    setIsCameraActive(false);
-  };
+  if (!isOpen) return null;
 
   // Capture Photo from Camera Stream
   const captureCameraPhoto = () => {
