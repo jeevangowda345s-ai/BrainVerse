@@ -276,6 +276,38 @@ class AudioHapticsEngine {
       });
     } catch (e) {}
   }
+
+  public playPaymentSuccess() {
+    if (!this.soundEnabled) return;
+    this.initCtx();
+    if (!this.ctx) return;
+
+    try {
+      const now = this.ctx.currentTime;
+      // Vibrant cash register / victory chime arpeggio (C6, E6, G6, C7, E7)
+      const frequencies = [1046.5, 1318.51, 1567.98, 2093.0, 2637.02];
+
+      frequencies.forEach((freq, idx) => {
+        const osc = this.ctx!.createOscillator();
+        const gain = this.ctx!.createGain();
+
+        osc.type = idx % 2 === 0 ? 'sine' : 'triangle';
+        osc.frequency.setValueAtTime(freq, now + idx * 0.06);
+
+        gain.gain.setValueAtTime(0, now + idx * 0.06);
+        gain.gain.linearRampToValueAtTime(0.3, now + idx * 0.06 + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.06 + 0.4);
+
+        osc.connect(gain);
+        gain.connect(this.ctx!.destination);
+
+        osc.start(now + idx * 0.06);
+        osc.stop(now + idx * 0.06 + 0.4);
+      });
+
+      this.triggerHaptic('levelUp');
+    } catch (e) {}
+  }
 }
 
 export const audioHaptics = new AudioHapticsEngine();

@@ -6,7 +6,8 @@ import {
   ThemeSettings, 
   GameSessionResult,
   MultiplayerRoom,
-  QRMerchantConfig
+  QRMerchantConfig,
+  ProUpgradeRequest
 } from '../types';
 
 const USER_KEY = 'mindforge_user_profile_v2';
@@ -22,6 +23,7 @@ export const DEFAULT_QR_CONFIG: QRMerchantConfig = {
   qrImageUrl: '',
   wheelSpinFeeINR: 9,
   redemptionFeeINR: 10,
+  premiumFeeINR: 99,
   freeSpinsForPremium: true,
   freeSpinCoinsForPremium: 500,
 };
@@ -544,4 +546,29 @@ export function loadQRMerchantConfig(): QRMerchantConfig {
 export function saveQRMerchantConfig(config: QRMerchantConfig): void {
   if (typeof window === 'undefined') return;
   localStorage.setItem(QR_CONFIG_KEY, JSON.stringify(config));
+}
+
+const PRO_REQUESTS_KEY = 'brainverse_pro_upgrade_requests';
+
+export function loadProUpgradeRequests(): ProUpgradeRequest[] {
+  if (typeof window === 'undefined') return [];
+  const saved = localStorage.getItem(PRO_REQUESTS_KEY);
+  if (!saved) return [];
+  try {
+    return JSON.parse(saved);
+  } catch (e) {
+    return [];
+  }
+}
+
+export function saveProUpgradeRequest(req: ProUpgradeRequest): void {
+  if (typeof window === 'undefined') return;
+  const list = loadProUpgradeRequests();
+  const existingIdx = list.findIndex(r => r.id === req.id);
+  if (existingIdx >= 0) {
+    list[existingIdx] = req;
+  } else {
+    list.unshift(req);
+  }
+  localStorage.setItem(PRO_REQUESTS_KEY, JSON.stringify(list));
 }

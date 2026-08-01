@@ -76,8 +76,21 @@ export interface QRMerchantConfig {
   qrImageUrl?: string;
   wheelSpinFeeINR: number;
   redemptionFeeINR: number;
+  premiumFeeINR: number;
   freeSpinsForPremium: boolean;
   freeSpinCoinsForPremium: number;
+}
+
+export interface ProUpgradeRequest {
+  id: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  utrNumber: string;
+  amountINR: number;
+  status: 'pending' | 'approved' | 'declined';
+  timestamp: string;
+  declineReason?: string;
 }
 
 export interface RedemptionRecord {

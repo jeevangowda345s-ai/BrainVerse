@@ -21,10 +21,12 @@ import {
   User,
   UserPlus,
   LogOut,
-  IndianRupee
+  IndianRupee,
+  Crown
 } from 'lucide-react';
 import { UserProfile, ThemeSettings } from '../types';
 import { audioHaptics } from '../utils/audioHaptics';
+import { loadQRMerchantConfig } from '../utils/storage';
 
 interface NavbarProps {
   activeTab: string;
@@ -37,6 +39,7 @@ interface NavbarProps {
   onOpenAuth: () => void;
   onSignOut: () => void;
   onOpenRedeemCash: () => void;
+  onOpenPremium: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -50,6 +53,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenAuth,
   onSignOut,
   onOpenRedeemCash,
+  onOpenPremium,
 }) => {
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Brain },
@@ -227,6 +231,30 @@ export const Navbar: React.FC<NavbarProps> = ({
                 {theme.palette ? theme.palette.replace('_', ' ') : 'Midnight'}
               </span>
             </button>
+
+            {/* PRO Membership Button */}
+            {(() => {
+              const proFeeINR = loadQRMerchantConfig().premiumFeeINR || 99;
+              return (
+                <button
+                  onClick={onOpenPremium}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-black transition-all ${
+                    user.isPremium
+                      ? 'bg-amber-500/10 border-amber-500/40 text-amber-400 hover:bg-amber-500/20 shadow-[0_0_12px_rgba(245,158,11,0.2)]'
+                      : 'bg-gradient-to-r from-amber-400 via-orange-500 to-yellow-400 text-slate-950 hover:brightness-110 shadow-[0_0_15px_rgba(245,158,11,0.3)] animate-pulse'
+                  }`}
+                  title={`MindForge PRO Membership - 5X Coins, Diamonds & XP (₹${proFeeINR} INR)`}
+                >
+                  <Crown className="w-4 h-4 text-amber-400" />
+                  <span className="hidden sm:inline">
+                    {user.isPremium ? 'PRO (5X Active)' : `Join PRO ₹${proFeeINR}`}
+                  </span>
+                  <span className="sm:hidden text-[10px]">
+                    {user.isPremium ? '5X' : 'PRO'}
+                  </span>
+                </button>
+              );
+            })()}
 
             {/* Master Dev Authority / Admin Panel Button */}
             <button

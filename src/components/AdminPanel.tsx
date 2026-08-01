@@ -31,10 +31,10 @@ import {
   XCircle,
   Clock
 } from 'lucide-react';
-import { UserProfile, QRMerchantConfig, RedemptionRecord } from '../types';
+import { UserProfile, QRMerchantConfig, RedemptionRecord, ProUpgradeRequest } from '../types';
 import { audioHaptics } from '../utils/audioHaptics';
-import { loadQRMerchantConfig, saveQRMerchantConfig, saveUserProfile, DEFAULT_QR_CONFIG } from '../utils/storage';
-import { saveUserProfileToFirestore } from '../services/firebaseService';
+import { loadQRMerchantConfig, saveQRMerchantConfig, saveUserProfile, loadProUpgradeRequests, saveProUpgradeRequest, DEFAULT_QR_CONFIG } from '../utils/storage';
+import { saveUserProfileToFirestore, fetchProUpgradeRequestsFromFirestore, updateProUpgradeRequestInFirestore } from '../services/firebaseService';
 
 interface AdminPanelProps {
   user: UserProfile;
@@ -58,7 +58,72 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [keyError, setKeyError] = useState<string | null>(null);
 
   // Active Admin Tab
-  const [activeAdminTab, setActiveAdminTab] = useState<'qr_upload' | 'users' | 'premium_rewards' | 'redemptions' | 'version'>('qr_upload');
+  const [activeAdminTab, setActiveAdminTab] = useState<'qr_upload' | 'users' | 'premium_rewards' | 'redemptions' | 'utr_approvals' | 'version'>('utr_approvals');
+
+  // UTR & PRO Verification Management State
+  const [proRequests, setProRequests] = useState<ProUpgradeRequest[]>([]);
+  const [proReqFilter, setProReqFilter] = useState<'all' | 'pending' | 'approved' | 'declined'>('pending');
+  const [proActionMsg, setProActionMsg] = useState<string | null>(null);
+
+  // Load all PRO upgrade requests from LocalStorage & Firestore
+  const loadAllProRequests = async () => {
+    const local = loadProUpgradeRequests();
+    let remote: ProUpgradeRequest[] = [];
+    try {
+      remote = await fetchProUpgradeRequestsFromFirestore();
+    } catch (e) {}
+
+    const map = new Map<string, ProUpgradeRequest>();
+    remote.forEach(r => map.set(r.id, r));
+    local.forEach(r => {
+      if (!map.has(r.id)) map.set(r.id, r);
+    });
+
+    setProRequests(Array.from(map.values()));
+  };
+
+  useEffect(() => {
+    loadAllProRequests();
+  }, []);
+
+  // Accept / Approve User PRO Membership
+  const handleApproveProRequest = async (req: ProUpgradeRequest) => {
+    // Play Payment Successful Sound Effect Chime!
+    audioHaptics.playPaymentSuccess();
+    audioHaptics.playFanfare();
+
+    const updatedReq: ProUpgradeRequest = { ...req, status: 'approved' };
+    saveProUpgradeRequest(updatedReq);
+
+    await updateProUpgradeRequestInFirestore(req.id, req.userId, 'approved');
+
+    // If current user is target user, upgrade active session as well
+    if (req.userId === user.id || user.email === req.userEmail) {
+      const updatedUser = { ...user, isPremium: true };
+      if (onUpdateUser) onUpdateUser(updatedUser);
+      saveUserProfile(updatedUser);
+      setEditingIsPremium(true);
+    }
+
+    setProActionMsg(`APPROVED! User "${req.userName}" is now a VIP PRO Member.`);
+    setTimeout(() => setProActionMsg(null), 3500);
+    loadAllProRequests();
+  };
+
+  // Decline / Reject User PRO Request
+  const handleDeclineProRequest = async (req: ProUpgradeRequest) => {
+    audioHaptics.triggerHaptic('error');
+    const reason = prompt('Enter decline reason for user:', 'Transaction UTR reference not verified in merchant bank statement.') || 'UTR Ref not found';
+
+    const updatedReq: ProUpgradeRequest = { ...req, status: 'declined', declineReason: reason };
+    saveProUpgradeRequest(updatedReq);
+
+    await updateProUpgradeRequestInFirestore(req.id, req.userId, 'declined', reason);
+
+    setProActionMsg(`DECLINED request for ${req.userName}. Reason: ${reason}`);
+    setTimeout(() => setProActionMsg(null), 3500);
+    loadAllProRequests();
+  };
 
   // QR Merchant Config State
   const [qrConfig, setQrConfig] = useState<QRMerchantConfig>(loadQRMerchantConfig());
@@ -368,6 +433,23 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       {/* Admin Navigation Tabs */}
       <div className="flex overflow-x-auto gap-2 p-1.5 rounded-2xl bg-slate-900 border border-slate-800 scrollbar-none">
         <button
+          onClick={() => { setActiveAdminTab('utr_approvals'); loadAllProRequests(); }}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${
+            activeAdminTab === 'utr_approvals'
+              ? 'bg-amber-500 text-slate-950 font-black shadow-md shadow-amber-500/20'
+              : 'text-amber-400 hover:text-white hover:bg-slate-800'
+          }`}
+        >
+          <ShieldCheck className="w-4 h-4 text-amber-300" />
+          <span>UTR Checks & PRO Approvals</span>
+          {proRequests.filter(r => r.status === 'pending').length > 0 && (
+            <span className="px-1.5 py-0.5 rounded-full bg-rose-500 text-white text-[10px] font-black animate-pulse">
+              {proRequests.filter(r => r.status === 'pending').length}
+            </span>
+          )}
+        </button>
+
+        <button
           onClick={() => setActiveAdminTab('qr_upload')}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${
             activeAdminTab === 'qr_upload'
@@ -427,6 +509,158 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           <span>System & Broadcast</span>
         </button>
       </div>
+
+      {/* TAB 0: UTR CHECKS & PRO MEMBERSHIP APPROVALS */}
+      {activeAdminTab === 'utr_approvals' && (
+        <div className="p-6 rounded-3xl bg-slate-900 border border-amber-500/40 space-y-6 shadow-xl">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+            <div>
+              <h2 className="text-lg font-black text-white flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-amber-400" />
+                UTR Verification Rights & PRO User Approvals
+              </h2>
+              <p className="text-xs text-slate-400">
+                Check submitted 12-digit UTR numbers against your UPI statement and click Accept to activate 5X PRO Membership or Decline to reject.
+              </p>
+            </div>
+
+            <button
+              onClick={loadAllProRequests}
+              className="px-3.5 py-2 rounded-xl bg-slate-800 border border-slate-700 hover:bg-slate-700 text-xs text-slate-200 font-bold flex items-center gap-1.5 transition shrink-0"
+            >
+              <RefreshCw className="w-3.5 h-3.5 text-amber-400" />
+              <span>Refresh UTR List</span>
+            </button>
+          </div>
+
+          {proActionMsg && (
+            <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/40 text-amber-300 text-xs font-bold flex items-center gap-2 animate-fade-in">
+              <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+              <span>{proActionMsg}</span>
+            </div>
+          )}
+
+          {/* Request Status Filter Tabs */}
+          <div className="flex items-center gap-2">
+            {(['all', 'pending', 'approved', 'declined'] as const).map(filter => (
+              <button
+                key={filter}
+                onClick={() => setProReqFilter(filter)}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold capitalize transition ${
+                  proReqFilter === filter
+                    ? 'bg-amber-500 text-slate-950 font-black'
+                    : 'bg-slate-950 text-slate-400 border border-slate-800 hover:text-white'
+                }`}
+              >
+                {filter} {filter === 'pending' && `(${proRequests.filter(r => r.status === 'pending').length})`}
+              </button>
+            ))}
+          </div>
+
+          {/* List of UTR Requests */}
+          <div className="space-y-3">
+            {(() => {
+              const filtered = proRequests.filter(r => proReqFilter === 'all' || r.status === proReqFilter);
+              if (filtered.length === 0) {
+                return (
+                  <div className="p-8 rounded-2xl bg-slate-950 border border-slate-800 text-center text-slate-400 space-y-2">
+                    <Clock className="w-8 h-8 text-amber-500/40 mx-auto" />
+                    <p className="text-xs font-bold">No UTR Requests found matching filter "{proReqFilter}".</p>
+                    <p className="text-[11px] text-slate-500">When users pay ₹{qrConfig.premiumFeeINR || 99} and submit their UTR number in PRO Membership modal, their transaction will appear here for verification.</p>
+                  </div>
+                );
+              }
+
+              return filtered.map(req => (
+                <div 
+                  key={req.id} 
+                  className={`p-4 sm:p-5 rounded-2xl bg-slate-950 border transition space-y-3 ${
+                    req.status === 'pending'
+                      ? 'border-amber-500/50 shadow-lg shadow-amber-500/5'
+                      : req.status === 'approved'
+                      ? 'border-emerald-500/40'
+                      : 'border-rose-500/30'
+                  }`}
+                >
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-black text-white">{req.userName}</span>
+                        <span className="text-xs text-slate-400 font-mono">({req.userEmail})</span>
+                      </div>
+                      <div className="text-[11px] text-slate-400 mt-0.5">
+                        Submitted: {new Date(req.timestamp).toLocaleString()} • Amount: <span className="text-emerald-400 font-bold font-mono">₹{req.amountINR} INR</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {req.status === 'pending' && (
+                        <span className="px-3 py-1 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs font-bold flex items-center gap-1.5 animate-pulse">
+                          <Clock className="w-3.5 h-3.5" /> PENDING VERIFICATION
+                        </span>
+                      )}
+                      {req.status === 'approved' && (
+                        <span className="px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center gap-1.5">
+                          <CheckCircle className="w-3.5 h-3.5 text-emerald-400" /> ACCEPTED & PRO ACTIVE
+                        </span>
+                      )}
+                      {req.status === 'declined' && (
+                        <span className="px-3 py-1 rounded-full bg-rose-500/20 border border-rose-500/40 text-rose-300 text-xs font-bold flex items-center gap-1.5">
+                          <XCircle className="w-3.5 h-3.5 text-rose-400" /> DECLINED
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* UTR Reference Box & Admin Action Controls */}
+                  <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <div className="space-y-1">
+                      <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">UPI / PhonePe UTR Ref Number</div>
+                      <div className="text-sm font-mono font-black text-amber-400 tracking-widest flex items-center gap-2">
+                        <span>{req.utrNumber}</span>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(req.utrNumber);
+                            audioHaptics.playClick();
+                            alert(`Copied UTR: ${req.utrNumber}`);
+                          }}
+                          className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px]"
+                          title="Copy UTR to Clipboard"
+                        >
+                          Copy UTR
+                        </button>
+                      </div>
+                    </div>
+
+                    {req.status === 'pending' && (
+                      <div className="flex items-center gap-2 w-full sm:w-auto">
+                        <button
+                          onClick={() => handleApproveProRequest(req)}
+                          className="flex-1 sm:flex-none px-4 py-2 rounded-xl bg-emerald-500 text-slate-950 font-black text-xs uppercase hover:bg-emerald-400 transition flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-500/20"
+                        >
+                          <CheckCircle className="w-4 h-4" /> Accept & Activate PRO
+                        </button>
+                        <button
+                          onClick={() => handleDeclineProRequest(req)}
+                          className="flex-1 sm:flex-none px-4 py-2 rounded-xl bg-rose-500/20 text-rose-300 border border-rose-500/40 font-bold text-xs uppercase hover:bg-rose-500/30 transition flex items-center justify-center gap-1.5"
+                        >
+                          <XCircle className="w-4 h-4" /> Decline
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {req.declineReason && (
+                    <div className="text-xs text-rose-300/90 italic">
+                      Decline reason: "{req.declineReason}"
+                    </div>
+                  )}
+                </div>
+              ));
+            })()}
+          </div>
+        </div>
+      )}
 
       {/* TAB 1: UPLOAD PHONEPE QR SCANNER */}
       {activeAdminTab === 'qr_upload' && (
@@ -525,7 +759,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </div>
 
               {/* Fee Inputs */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-slate-300">Wheel Spin Fee (₹ INR)</label>
                   <input
@@ -543,6 +777,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     value={qrConfig.redemptionFeeINR}
                     onChange={(e) => setQrConfig(prev => ({ ...prev, redemptionFeeINR: Number(e.target.value) }))}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs font-mono font-bold text-emerald-400 focus:outline-none"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-300">PRO Join Fee (₹ INR)</label>
+                  <input
+                    type="number"
+                    value={qrConfig.premiumFeeINR || 99}
+                    onChange={(e) => setQrConfig(prev => ({ ...prev, premiumFeeINR: Number(e.target.value) }))}
+                    className="w-full bg-slate-950 border border-amber-500/40 rounded-xl px-3.5 py-2 text-xs font-mono font-bold text-amber-400 focus:outline-none"
                   />
                 </div>
               </div>
@@ -810,6 +1054,41 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               >
                 <Coins className="w-4 h-4" /> Add 1,000,000 Coins to My Account
               </button>
+            </div>
+
+            {/* Action 3: Change Premium Membership Joining Fee (₹ INR) */}
+            <div className="p-5 rounded-3xl bg-slate-950 border border-amber-500/30 space-y-4 md:col-span-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center font-bold text-lg">
+                    <IndianRupee className="w-5 h-5 text-amber-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-white">Configure PRO Membership Fee (₹ INR)</h3>
+                    <p className="text-[11px] text-slate-400">Change the joining price required for users to unlock 5X PRO Membership.</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="text-2xl font-black text-emerald-400 font-mono">₹{qrConfig.premiumFeeINR || 99} INR</span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 pt-1">
+                <input
+                  type="number"
+                  min="1"
+                  placeholder="Enter amount in INR (e.g. 99)"
+                  value={qrConfig.premiumFeeINR || 99}
+                  onChange={(e) => setQrConfig(prev => ({ ...prev, premiumFeeINR: Number(e.target.value) }))}
+                  className="flex-1 bg-slate-900 border border-amber-500/40 rounded-xl px-4 py-2.5 text-sm text-emerald-400 font-mono font-bold focus:outline-none focus:border-amber-400"
+                />
+                <button
+                  onClick={handleSaveQRConfig}
+                  className="px-6 py-2.5 rounded-xl bg-amber-500 text-slate-950 font-black text-xs uppercase hover:bg-amber-400 transition flex items-center gap-1.5 shadow-lg shadow-amber-500/20"
+                >
+                  <Save className="w-4 h-4" /> Save New PRO Fee
+                </button>
+              </div>
             </div>
 
           </div>

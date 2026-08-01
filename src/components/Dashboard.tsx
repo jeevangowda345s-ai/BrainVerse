@@ -13,10 +13,11 @@ import {
   BarChart2, 
   Activity,
   Award,
-  BookOpen
+  BookOpen,
+  Crown
 } from 'lucide-react';
 import { UserProfile, GameInfo, DailyMission, CognitiveRatings } from '../types';
-import { INITIAL_GAMES } from '../utils/storage';
+import { INITIAL_GAMES, loadQRMerchantConfig } from '../utils/storage';
 import { audioHaptics } from '../utils/audioHaptics';
 import { DailyStreakTracker } from './DailyStreakTracker';
 
@@ -27,6 +28,7 @@ interface DashboardProps {
   onNavigateTab: (tab: string) => void;
   onClaimMission: (missionId: string) => void;
   onUpdateUser: (updatedUser: UserProfile) => void;
+  onOpenPremium?: () => void;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
@@ -36,6 +38,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onNavigateTab,
   onClaimMission,
   onUpdateUser,
+  onOpenPremium,
 }) => {
   const dailyQuotes = [
     "“The mind is not a vessel to be filled, but a fire to be kindled.” — Plutarch",
@@ -155,6 +158,46 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
       {/* DAILY STREAK TRACKING SYSTEM */}
       <DailyStreakTracker user={user} onUpdateUser={onUpdateUser} />
+
+      {/* PRO MEMBERSHIP BANNER (5X MULTIPLIER) */}
+      {(() => {
+        const proFeeINR = loadQRMerchantConfig().premiumFeeINR || 99;
+        return (
+          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-amber-950/40 via-orange-950/30 to-yellow-950/40 border border-amber-500/40 p-5 sm:p-6 shadow-2xl">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="relative flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-amber-500/20 border border-amber-500/50 flex items-center justify-center text-amber-400 shrink-0 shadow-lg">
+                  <Crown className="w-8 h-8 animate-pulse" />
+                </div>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-black text-amber-300 uppercase tracking-wide">
+                      {user.isPremium ? '👑 VIP PRO MEMBERSHIP ACTIVE' : `⚡ MINDFORGE PRO MEMBERSHIP (₹${proFeeINR} INR)`}
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/40 text-[10px] font-mono font-bold">
+                      5X MULTIPLIER
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-300">
+                    {user.isPremium 
+                      ? "Your PRO account is active! You are earning 5X Coins, 5X Diamonds, and 5X XP on all games & events!"
+                      : `Get 5X more Coins, Diamonds, and Brain Experience (XP) across all games for just ₹${proFeeINR} INR lifetime access!`}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={onOpenPremium}
+                className="px-6 py-3 rounded-2xl bg-gradient-to-r from-amber-400 via-orange-500 to-yellow-400 text-slate-950 font-black text-xs uppercase tracking-wider hover:brightness-110 transition shadow-xl shadow-amber-500/20 shrink-0 flex items-center gap-2"
+              >
+                <Crown className="w-4 h-4 text-slate-950" />
+                <span>{user.isPremium ? 'PRO Perks (Active)' : `Join PRO ₹${proFeeINR}`}</span>
+              </button>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* AI COACH RECOMMENDATION BANNER */}
       <div className="p-5 rounded-2xl bg-[#080808] border border-[#1A1A1A] flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg">

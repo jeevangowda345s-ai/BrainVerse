@@ -19,6 +19,7 @@ import { AuthModal } from './components/AuthModal';
 import { AuthScreen } from './components/AuthScreen';
 import { LevelUpModal } from './components/LevelUpModal';
 import { RedeemCashModal } from './components/RedeemCashModal';
+import { PremiumMembershipModal } from './components/PremiumMembershipModal';
 import { getRankForLevel } from './utils/ranks';
 
 // Mini Games
@@ -88,6 +89,7 @@ export default function App() {
   const [showAdminModal, setShowAdminModal] = useState<boolean>(false);
   const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
   const [showRedeemCashModal, setShowRedeemCashModal] = useState<boolean>(false);
+  const [showPremiumModal, setShowPremiumModal] = useState<boolean>(false);
   const [unlockedToastAchievement, setUnlockedToastAchievement] = useState<Achievement | null>(null);
   const [levelUpModalState, setLevelUpModalState] = useState<{ isOpen: boolean; oldLevel: number; newLevel: number } | null>(null);
 
@@ -122,8 +124,9 @@ export default function App() {
   // Level Up Trigger Handler
   const triggerLevelUp = (oldLevel: number, newLevel: number) => {
     const newRank = getRankForLevel(newLevel);
-    const bonusCoins = newLevel * 100;
-    const bonusDiamonds = 15;
+    const multiplier = user.isPremium ? 5 : 1;
+    const bonusCoins = (newLevel * 100) * multiplier;
+    const bonusDiamonds = 15 * multiplier;
 
     setUser(prev => ({
       ...prev,
@@ -232,17 +235,18 @@ export default function App() {
     }
   }, [theme]);
 
-  // Handle Daily Lucky Wheel Reward Claim (Atomically adds Brain Score, Coins, Diamonds & XP)
+  // Handle Daily Lucky Wheel Reward Claim (Atomically adds Brain Score, Coins, Diamonds & XP with 5X PRO multiplier)
   const handleClaimWheelReward = (rewards: { coins?: number; brainScore?: number; diamonds?: number; xp?: number }) => {
     audioHaptics.playCorrect();
     audioHaptics.triggerHaptic('success');
 
     setUser(prevUser => {
       const currentLevel = prevUser.level || 1;
-      const addedCoins = rewards.coins || 0;
-      const addedBrain = rewards.brainScore || 0;
-      const addedDiamonds = rewards.diamonds || 0;
-      const addedXP = rewards.xp || 0;
+      const multiplier = prevUser.isPremium ? 5 : 1;
+      const addedCoins = (rewards.coins || 0) * multiplier;
+      const addedBrain = (rewards.brainScore || 0) * multiplier;
+      const addedDiamonds = (rewards.diamonds || 0) * multiplier;
+      const addedXP = (rewards.xp || 0) * multiplier;
 
       const newXP = (prevUser.xp || 0) + addedXP;
       const newLevel = Math.floor(newXP / 300) + 1;
@@ -264,7 +268,14 @@ export default function App() {
     });
 
     if (user.id) {
-      addWheelRewardsInFirestore(user.id, rewards);
+      const multiplier = user.isPremium ? 5 : 1;
+      const multipliedRewards = {
+        coins: (rewards.coins || 0) * multiplier,
+        brainScore: (rewards.brainScore || 0) * multiplier,
+        diamonds: (rewards.diamonds || 0) * multiplier,
+        xp: (rewards.xp || 0) * multiplier,
+      };
+      addWheelRewardsInFirestore(user.id, multipliedRewards);
     }
   };
 
@@ -282,15 +293,20 @@ export default function App() {
     setActiveTab('game_active');
   };
 
-  // Handle Game Completion Result with Functional State Update (Fixes Coins Not Adding Up)
+  // Handle Game Completion Result with 5X PRO Multiplier Support
   const handleGameFinish = (score: number, accuracy: number, reactionTimeMs: number) => {
     audioHaptics.playFanfare();
     audioHaptics.triggerHaptic('levelUp');
     confetti({ particleCount: 60, spread: 70, origin: { y: 0.6 } });
 
-    const xpGained = Math.max(20, Math.round(score / 2));
-    // Max 100 coins received if any game wins
-    const coinsGained = Math.min(100, Math.max(10, Math.round(score / 10)));
+    const multiplier = user.isPremium ? 5 : 1;
+    const baseXP = Math.max(20, Math.round(score / 2));
+    const baseCoins = Math.min(100, Math.max(10, Math.round(score / 10)));
+    const baseBrainScore = Math.round(score / 20);
+
+    const xpGained = baseXP * multiplier;
+    const coinsGained = baseCoins * multiplier;
+    const brainScoreGained = baseBrainScore * multiplier;
 
     const categoryRatingKey: keyof UserProfile['ratings'] = 
       activeGameId === 'memory_matrix' || activeGameId === 'color_shape_memory' ? 'memory'
@@ -300,14 +316,14 @@ export default function App() {
       : activeGameId === 'sudoku' || activeGameId === 'maze_escape' ? 'focus'
       : 'logic';
 
-    // Functional State Update to guarantee coins and XP add up correctly without stale closures
+    // Functional State Update to guarantee coins and XP add up correctly with PRO 5X multiplier
     setUser(prevUser => {
       const currentLevel = prevUser.level || 1;
       const newXP = (prevUser.xp || 0) + xpGained;
       const newLevel = Math.floor(newXP / 300) + 1;
-      const newBrainScore = (prevUser.brainScore || 1000) + Math.round(score / 20);
+      const newBrainScore = (prevUser.brainScore || 1000) + brainScoreGained;
       const currentRating = prevUser.ratings[categoryRatingKey] || 1200;
-      const newRating = Math.min(2500, currentRating + Math.round(score / 30));
+      const newRating = Math.min(2500, currentRating + Math.round((score / 30) * multiplier));
 
       if (newLevel > currentLevel) {
         setTimeout(() => {
@@ -364,8 +380,8 @@ export default function App() {
       if (bonusXP > 0 || bonusCoins > 0) {
         setUser(prev => ({
           ...prev,
-          xp: (prev.xp || 0) + bonusXP,
-          coins: (prev.coins || 0) + bonusCoins,
+          xp: (prev.xp || 0) + (bonusXP * multiplier),
+          coins: (prev.coins || 0) + (bonusCoins * multiplier),
         }));
       }
     }
@@ -375,7 +391,7 @@ export default function App() {
     setActiveTab('dashboard');
   };
 
-  // Claim Mission with Functional State Update
+  // Claim Mission with Functional State Update & 5X Multiplier
   const handleClaimMission = (missionId: string) => {
     audioHaptics.playCorrect();
     audioHaptics.triggerHaptic('success');
@@ -383,8 +399,9 @@ export default function App() {
 
     const targetMission = missions.find(m => m.id === missionId);
     if (targetMission && !targetMission.claimed) {
-      const rewardCoins = targetMission.rewardCoins || 50;
-      const rewardXP = targetMission.rewardXP || 100;
+      const multiplier = user.isPremium ? 5 : 1;
+      const rewardCoins = (targetMission.rewardCoins || 50) * multiplier;
+      const rewardXP = (targetMission.rewardXP || 100) * multiplier;
 
       setUser(prev => {
         const currentLevel = prev.level || 1;
@@ -484,6 +501,7 @@ export default function App() {
         onOpenAuth={() => setShowAuthModal(true)}
         onSignOut={handleSignOut}
         onOpenRedeemCash={() => setShowRedeemCashModal(true)}
+        onOpenPremium={() => setShowPremiumModal(true)}
       />
 
       {/* Main View Area */}
@@ -497,6 +515,7 @@ export default function App() {
             onNavigateTab={setActiveTab}
             onClaimMission={handleClaimMission}
             onUpdateUser={handleUpdateUser}
+            onOpenPremium={() => setShowPremiumModal(true)}
           />
         )}
 
@@ -626,6 +645,14 @@ export default function App() {
         user={user}
         onRedeemSuccess={handleRedeemSuccess}
         onAddTestCoins={handleAddTestCoins}
+      />
+
+      {/* MindForge PRO Premium Membership Modal (₹299 INR) */}
+      <PremiumMembershipModal
+        isOpen={showPremiumModal}
+        onClose={() => setShowPremiumModal(false)}
+        user={user}
+        onUpdateUser={handleUpdateUser}
       />
 
     </div>

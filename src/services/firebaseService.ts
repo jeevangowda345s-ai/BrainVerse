@@ -16,7 +16,7 @@ import {
   increment,
   where
 } from '../lib/firebase';
-import { UserProfile, GameSessionResult } from '../types';
+import { UserProfile, GameSessionResult, ProUpgradeRequest } from '../types';
 import { DEFAULT_USER } from '../utils/storage';
 
 export interface PublicActivityItem {
@@ -354,4 +354,60 @@ export async function finishMultiplayerMatch(
     winnerId,
     winnerName: winnerName || null,
   });
+}
+
+// Submit PRO Upgrade Request with UTR in Firestore
+export async function submitProUpgradeRequestToFirestore(request: ProUpgradeRequest): Promise<void> {
+  try {
+    const reqRef = doc(db, 'pro_upgrade_requests', request.id);
+    await setDoc(reqRef, {
+      ...request,
+      createdAt: serverTimestamp()
+    });
+  } catch (err) {
+    console.error('Error submitting PRO upgrade request to Firestore:', err);
+  }
+}
+
+// Fetch all PRO Upgrade Requests for Admin Review
+export async function fetchProUpgradeRequestsFromFirestore(): Promise<ProUpgradeRequest[]> {
+  try {
+    const q = query(collection(db, 'pro_upgrade_requests'), orderBy('timestamp', 'desc'), limit(50));
+    const snap = await getDocs(q);
+    const results: ProUpgradeRequest[] = [];
+    snap.forEach((docSnap) => {
+      results.push({ id: docSnap.id, ...docSnap.data() } as ProUpgradeRequest);
+    });
+    return results;
+  } catch (err) {
+    console.error('Error fetching PRO upgrade requests from Firestore:', err);
+    return [];
+  }
+}
+
+// Update PRO Request status & grant Premium to User if approved
+export async function updateProUpgradeRequestInFirestore(
+  requestId: string,
+  userId: string,
+  status: 'approved' | 'declined',
+  declineReason?: string
+): Promise<void> {
+  try {
+    const reqRef = doc(db, 'pro_upgrade_requests', requestId);
+    await updateDoc(reqRef, {
+      status,
+      declineReason: declineReason || null,
+      updatedAt: new Date().toISOString()
+    });
+
+    if (status === 'approved' && userId) {
+      const userRef = doc(db, 'users', userId);
+      await updateDoc(userRef, {
+        isPremium: true,
+        updatedAt: new Date().toISOString()
+      });
+    }
+  } catch (err) {
+    console.error('Error updating PRO request status in Firestore:', err);
+  }
 }
