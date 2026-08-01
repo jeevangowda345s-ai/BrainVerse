@@ -324,11 +324,6 @@ export const PremiumMembershipModal: React.FC<PremiumMembershipModalProps> = ({
                   </span>
                 </div>
                 <div className="font-black text-white text-sm">{merchantName}</div>
-                {qrConfig.gstin && (
-                  <div className="text-[10px] text-slate-400 font-mono">
-                    GSTIN / Reg ID: <span className="text-cyan-300 font-bold">{qrConfig.gstin}</span>
-                  </div>
-                )}
               </div>
 
               <div className="p-3.5 rounded-2xl bg-slate-900 border border-amber-500/30 space-y-1.5">

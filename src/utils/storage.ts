@@ -26,7 +26,6 @@ export const DEFAULT_QR_CONFIG: QRMerchantConfig = {
   premiumFeeINR: 99,
   freeSpinsForPremium: true,
   freeSpinCoinsForPremium: 500,
-  gstin: '29AAACM2026M1Z8',
   officialEmail: 'payments@mindforge.app',
   businessAddress: 'MindForge Tech Park, Suite 402, Outer Ring Road, Bengaluru, KA 560103',
   verifiedMerchantSeal: true,

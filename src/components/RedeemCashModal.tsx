@@ -609,11 +609,6 @@ export const RedeemCashModal: React.FC<RedeemCashModalProps> = ({
                   <div className="text-[11px] text-purple-300 font-mono font-bold">
                     UPI ID: {merchantUpi} • ₹{redemptionFeeINR}.00 Verification Fee
                   </div>
-                  {qrConfig.gstin && (
-                    <div className="text-[10px] text-slate-400 font-mono">
-                      GSTIN / Reg: <span className="text-cyan-300 font-bold">{qrConfig.gstin}</span>
-                    </div>
-                  )}
                 </div>
 
                 {/* UPI Option below the scanner */}

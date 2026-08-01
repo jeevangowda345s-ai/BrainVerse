@@ -79,7 +79,6 @@ export interface QRMerchantConfig {
   premiumFeeINR: number;
   freeSpinsForPremium: boolean;
   freeSpinCoinsForPremium: number;
-  gstin?: string;
   officialEmail?: string;
   businessAddress?: string;
   verifiedMerchantSeal?: boolean;

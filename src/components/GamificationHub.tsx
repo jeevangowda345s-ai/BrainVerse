@@ -450,7 +450,7 @@ export const GamificationHub: React.FC<GamificationHubProps> = ({
                   Merchant: <strong className="text-white">{MERCHANT_NAME}</strong> ({UPI_ID})
                 </div>
                 <div className="text-[11px] text-emerald-400 font-semibold flex items-center justify-center gap-1 mt-1">
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> PhonePe Instant Merchant Verification
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> NPCI Instant UPI Merchant Verification
                 </div>
               </div>
 
@@ -460,7 +460,7 @@ export const GamificationHub: React.FC<GamificationHubProps> = ({
                   {spinQrDataUrl ? (
                     <img
                       src={spinQrDataUrl}
-                      alt="PhonePe Scanner QR"
+                      alt="UPI Scanner QR"
                       className="w-52 h-52 mx-auto object-contain rounded-lg"
                     />
                   ) : (
@@ -511,7 +511,7 @@ export const GamificationHub: React.FC<GamificationHubProps> = ({
                   <Lock className="w-4 h-4 text-slate-500 absolute right-3.5 top-3.5" />
                 </div>
                 <p className="text-[10px] text-slate-400">
-                  Found in your PhonePe transaction details after paying ₹9 to {MERCHANT_NAME}.
+                  Found in your UPI app transaction details after paying ₹{SPIN_FEE_INR} to {MERCHANT_NAME}.
                 </p>
               </div>
 
