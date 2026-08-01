@@ -6,6 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import confetti from 'canvas-confetti';
 import { Navbar } from './components/Navbar';
+import { Footer } from './components/Footer';
 import { Dashboard } from './components/Dashboard';
 import { GamesCatalog } from './components/GamesCatalog';
 import { AICoach } from './components/AICoach';
@@ -581,6 +582,14 @@ export default function App() {
         )}
 
       </main>
+
+      {/* Footer Component */}
+      <Footer
+        onNavigateTab={setActiveTab}
+        onOpenRedeemCash={() => setShowRedeemCashModal(true)}
+        onOpenPremium={() => setShowPremiumModal(true)}
+        user={user}
+      />
 
       {/* Settings Modal */}
       {showSettings && (
