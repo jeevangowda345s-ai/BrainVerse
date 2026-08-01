@@ -127,7 +127,7 @@ export async function adminUpdateUserProfileInFirestore(targetUserId: string, up
   }
 }
 
-// Revoke PRO VIP status from ALL users EXCEPT master admin jeevangowda345s@gmail.com
+// Revoke PRO VIP and Admin status from ALL users EXCEPT master admin jeevangowda345s@gmail.com
 export async function revokeAllNonAdminProUsersFromFirestore(): Promise<number> {
   const MASTER_ADMIN = 'jeevangowda345s@gmail.com';
   try {
@@ -141,12 +141,13 @@ export async function revokeAllNonAdminProUsersFromFirestore(): Promise<number> 
       const userEmail = (data.email || '').toLowerCase().trim();
       const isMasterAdmin = userEmail === MASTER_ADMIN;
 
-      if (!isMasterAdmin && data.isPremium) {
+      if (!isMasterAdmin && (data.isPremium || data.isAdmin)) {
         revokedCount++;
         const userRef = doc(db, 'users', docSnap.id);
         promises.push(
           setDoc(userRef, {
             isPremium: false,
+            isAdmin: false,
             updatedAt: new Date().toISOString()
           }, { merge: true })
         );
@@ -165,7 +166,7 @@ export async function revokeAllNonAdminProUsersFromFirestore(): Promise<number> 
     await Promise.all(promises);
     return revokedCount;
   } catch (err) {
-    console.error('Failed to revoke non-admin PRO VIP users in Firestore:', err);
+    console.error('Failed to revoke non-admin PRO VIP and Admin users in Firestore:', err);
     return 0;
   }
 }

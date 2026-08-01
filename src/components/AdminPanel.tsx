@@ -194,7 +194,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       setEditingStreak(target.streak || 1);
       setEditingXp(target.xp || 0);
       setEditingIsPremium(isTargetMaster); // STRICT: Only master admin can be PRO VIP
-      setEditingIsAdmin(isTargetMaster || Boolean(target.isAdmin));
+      setEditingIsAdmin(isTargetMaster); // STRICT: Only master admin can be Admin
     }
   }, [selectedUserId, allRegisteredUsers, user]);
 
@@ -281,7 +281,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       streak: editingStreak,
       xp: editingXp,
       isPremium: isTargetMaster, // STRICT: Only jeevangowda345s@gmail.com is PRO VIP
-      isAdmin: isTargetMaster || editingIsAdmin,
+      isAdmin: isTargetMaster, // STRICT: Only jeevangowda345s@gmail.com is Admin
     };
 
     // Save directly to Firestore for target user
@@ -306,7 +306,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     const revokedCount = await revokeAllNonAdminProUsersFromFirestore();
     audioHaptics.playFanfare();
     audioHaptics.triggerHaptic('success');
-    setUserSaveMsg(`PRO VIP Access Enforced: Removed PRO VIP status from ${revokedCount} non-admin users. Only Master Admin (${MASTER_ADMIN_EMAIL}) is PRO VIP.`);
+    setUserSaveMsg(`Single Admin Policy Enforced: Removed Admin & PRO VIP privileges from non-master accounts. Only Master Admin (${MASTER_ADMIN_EMAIL}) is Admin.`);
     setTimeout(() => setUserSaveMsg(null), 4500);
   };
 
@@ -895,8 +895,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     {selectedUser.isPremium && (
                       <span className="px-2 py-0.5 rounded text-[10px] font-black bg-gradient-to-r from-amber-400 to-amber-600 text-slate-950 uppercase">PRO VIP</span>
                     )}
-                    {selectedUser.isAdmin && (
-                      <span className="px-2 py-0.5 rounded text-[10px] font-black bg-purple-500/20 text-purple-300 border border-purple-500/40 uppercase">ADMIN</span>
+                    {Boolean(selectedUser.email && selectedUser.email.toLowerCase().trim() === MASTER_ADMIN_EMAIL.toLowerCase()) && (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-black bg-purple-500/20 text-purple-300 border border-purple-500/40 uppercase">MASTER ADMIN</span>
                     )}
                   </div>
                   <div className="text-xs text-slate-400 font-mono flex items-center gap-2 mt-0.5">
@@ -1181,8 +1181,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             {u.isPremium && (
                               <span className="px-1.5 py-0.2 rounded text-[9px] font-black bg-amber-400 text-slate-950 uppercase">PRO</span>
                             )}
-                            {u.isAdmin && (
-                              <span className="px-1.5 py-0.2 rounded text-[9px] font-black bg-purple-500/20 text-purple-300 border border-purple-500/40 uppercase">ADMIN</span>
+                            {Boolean(u.email && u.email.toLowerCase().trim() === MASTER_ADMIN_EMAIL.toLowerCase()) && (
+                              <span className="px-1.5 py-0.2 rounded text-[9px] font-black bg-purple-500/20 text-purple-300 border border-purple-500/40 uppercase">MASTER ADMIN</span>
                             )}
                             {isSelected && (
                               <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">SELECTED</span>

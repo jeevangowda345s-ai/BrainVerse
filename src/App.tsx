@@ -151,7 +151,7 @@ export default function App() {
               const isMasterAdmin = Boolean(nextEmail && nextEmail.toLowerCase().trim() === 'jeevangowda345s@gmail.com');
               
               const targetIsPremium = isMasterAdmin; // STRICT: Only jeevangowda345s@gmail.com gets PRO VIP
-              const targetIsAdmin = isMasterAdmin || Boolean(firestoreProfile.isAdmin);
+              const targetIsAdmin = isMasterAdmin; // STRICT: Only jeevangowda345s@gmail.com gets Admin rights
 
               const isIdentical =
                 prev.id === firebaseUser.uid &&
@@ -209,7 +209,7 @@ export default function App() {
     const enforcedUser = {
       ...updatedUser,
       isPremium: isMasterAdmin, // STRICT: Only admin jeevangowda345s@gmail.com is PRO VIP
-      isAdmin: isMasterAdmin || Boolean(updatedUser.isAdmin),
+      isAdmin: isMasterAdmin, // STRICT: Only admin jeevangowda345s@gmail.com is Admin
     };
     setUser(enforcedUser);
     if (enforcedUser.id) {
