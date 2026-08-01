@@ -471,7 +471,7 @@ export const GamificationHub: React.FC<GamificationHubProps> = ({
                 </div>
                 <div className="text-[11px] text-purple-300 font-medium flex items-center justify-center gap-1.5">
                   <QrCode className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Scan QR using PhonePe, Paytm, or GPay</span>
+                  <span>Scan QR using any UPI App</span>
                 </div>
 
                 {/* Quick Copy UPI & Pay App buttons */}
@@ -489,7 +489,7 @@ export const GamificationHub: React.FC<GamificationHubProps> = ({
                     href={UPI_PAY_URL}
                     className="px-3.5 py-1.5 rounded-xl bg-purple-500/20 border border-purple-500/40 text-purple-300 hover:bg-purple-500/30 text-xs font-bold transition flex items-center gap-1.5"
                   >
-                    <span>Open PhonePe App</span>
+                    <span>Pay via UPI App</span>
                   </a>
                 </div>
               </div>
@@ -497,7 +497,7 @@ export const GamificationHub: React.FC<GamificationHubProps> = ({
               {/* UTR Reference Verification Input */}
               <div className="space-y-2 pt-2 border-t border-slate-800">
                 <label className="block text-xs font-bold text-slate-300">
-                  Enter 12-Digit PhonePe UTR / Ref No. <span className="text-pink-400">*</span>
+                  Enter 12-Digit UPI UTR / Ref No. <span className="text-pink-400">*</span>
                 </label>
                 <div className="relative">
                   <input

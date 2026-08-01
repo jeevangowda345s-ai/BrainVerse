@@ -295,52 +295,22 @@ export const PremiumMembershipModal: React.FC<PremiumMembershipModalProps> = ({
                 Amount: ₹{MEMBERSHIP_FEE_INR}.00 INR
               </div>
 
-              {/* UPI Options below the scanner */}
+              {/* UPI Option below the scanner */}
               <div className="pt-2 border-t border-slate-200 space-y-2">
                 <div className="text-[11px] font-extrabold text-purple-900 uppercase tracking-wider">
-                  UPI Options — Tap to Pay Directly:
+                  UPI Direct Payment:
                 </div>
-                <div className="grid grid-cols-2 gap-1.5">
-                  <button
-                    onClick={() => {
-                      audioHaptics.playClick();
-                      window.location.href = upiPayString;
-                    }}
-                    className="py-2 px-2.5 rounded-xl bg-[#5f259f] text-white font-bold text-[11px] hover:bg-purple-800 transition flex items-center justify-center gap-1 shadow-sm"
-                  >
-                    <span>💜 PhonePe</span>
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      audioHaptics.playClick();
-                      window.location.href = upiPayString;
-                    }}
-                    className="py-2 px-2.5 rounded-xl bg-[#1a73e8] text-white font-bold text-[11px] hover:bg-blue-700 transition flex items-center justify-center gap-1 shadow-sm"
-                  >
-                    <span>🔵 GPay</span>
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      audioHaptics.playClick();
-                      window.location.href = upiPayString;
-                    }}
-                    className="py-2 px-2.5 rounded-xl bg-[#00baf2] text-white font-bold text-[11px] hover:bg-sky-600 transition flex items-center justify-center gap-1 shadow-sm"
-                  >
-                    <span>📲 Paytm</span>
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      audioHaptics.playClick();
-                      window.location.href = upiPayString;
-                    }}
-                    className="py-2 px-2.5 rounded-xl bg-emerald-600 text-white font-bold text-[11px] hover:bg-emerald-700 transition flex items-center justify-center gap-1 shadow-sm"
-                  >
-                    <span>⚡ BHIM / Any UPI</span>
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    audioHaptics.playClick();
+                    window.location.href = upiPayString;
+                  }}
+                  className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-purple-700 via-purple-600 to-indigo-600 hover:from-purple-800 hover:to-indigo-700 text-white font-bold text-xs transition flex items-center justify-center gap-2 shadow-md"
+                >
+                  <Zap className="w-4 h-4 text-amber-300" />
+                  <span>Pay via Any UPI App</span>
+                </button>
               </div>
             </div>
 

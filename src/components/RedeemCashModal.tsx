@@ -20,7 +20,8 @@ import {
   Receipt,
   History,
   Info,
-  RefreshCw
+  RefreshCw,
+  Zap
 } from 'lucide-react';
 import { UserProfile, RedemptionRecord } from '../types';
 import { audioHaptics } from '../utils/audioHaptics';
@@ -514,7 +515,7 @@ export const RedeemCashModal: React.FC<RedeemCashModalProps> = ({
                   type="text"
                   value={upiId}
                   onChange={(e) => setUpiId(e.target.value)}
-                  placeholder="Enter your PhonePe / GPay / Paytm UPI ID (e.g. 9876543210@paytm)"
+                  placeholder="Enter your UPI ID (e.g. name@upi or mobile@paytm)"
                   className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-3 text-xs text-white focus:border-cyan-500 focus:outline-none"
                 />
               )}
@@ -615,57 +616,23 @@ export const RedeemCashModal: React.FC<RedeemCashModalProps> = ({
                   )}
                 </div>
 
-                {/* UPI Options below the scanner */}
+                {/* UPI Option below the scanner */}
                 <div className="pt-2 border-t border-slate-800/80 space-y-2">
                   <div className="text-[11px] font-extrabold text-purple-300 uppercase tracking-wider">
-                    UPI Options — Tap below to redirect to app:
+                    Pay via UPI App:
                   </div>
                   
-                  <div className="grid grid-cols-2 gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        audioHaptics.playClick();
-                        window.location.href = upiPayString;
-                      }}
-                      className="py-2 px-2.5 rounded-xl bg-[#5f259f] text-white font-bold text-[11px] hover:bg-purple-700 transition flex items-center justify-center gap-1 shadow-sm"
-                    >
-                      <span>💜 PhonePe</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        audioHaptics.playClick();
-                        window.location.href = upiPayString;
-                      }}
-                      className="py-2 px-2.5 rounded-xl bg-[#1a73e8] text-white font-bold text-[11px] hover:bg-blue-700 transition flex items-center justify-center gap-1 shadow-sm"
-                    >
-                      <span>🔵 GPay</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        audioHaptics.playClick();
-                        window.location.href = upiPayString;
-                      }}
-                      className="py-2 px-2.5 rounded-xl bg-[#00baf2] text-white font-bold text-[11px] hover:bg-sky-600 transition flex items-center justify-center gap-1 shadow-sm"
-                    >
-                      <span>📲 Paytm</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        audioHaptics.playClick();
-                        window.location.href = upiPayString;
-                      }}
-                      className="py-2 px-2.5 rounded-xl bg-emerald-600 text-white font-bold text-[11px] hover:bg-emerald-700 transition flex items-center justify-center gap-1 shadow-sm"
-                    >
-                      <span>⚡ BHIM / Any UPI</span>
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      audioHaptics.playClick();
+                      window.location.href = upiPayString;
+                    }}
+                    className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs transition flex items-center justify-center gap-2 shadow-md"
+                  >
+                    <Zap className="w-4 h-4 text-amber-300" />
+                    <span>Pay via Any UPI App</span>
+                  </button>
 
                   <div className="pt-1 flex justify-center">
                     <button
