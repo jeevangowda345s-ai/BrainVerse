@@ -6,6 +6,7 @@ class AudioHapticsEngine {
   private ctx: AudioContext | null = null;
   private soundEnabled: boolean = true;
   private hapticsEnabled: boolean = true;
+  private volume: number = 0.8; // Default 80% volume
 
   constructor() {
     // Lazy init AudioContext on user interaction
@@ -25,9 +26,25 @@ class AudioHapticsEngine {
 
   private lastHapticTime: number = 0;
 
-  public setPreferences(sound: boolean, haptics: boolean) {
+  public setPreferences(sound: boolean, haptics: boolean, volumePercent?: number) {
     this.soundEnabled = sound;
     this.hapticsEnabled = haptics;
+    if (volumePercent !== undefined) {
+      this.volume = Math.max(0, Math.min(100, volumePercent)) / 100;
+      if (this.volume === 0) {
+        this.soundEnabled = false;
+      }
+    }
+  }
+
+  public setVolume(volumePercent: number) {
+    const clamped = Math.max(0, Math.min(100, volumePercent));
+    this.volume = clamped / 100;
+    this.soundEnabled = clamped > 0;
+  }
+
+  public getVolumePercentage(): number {
+    return Math.round(this.volume * 100);
   }
 
   // --- HAPTICS ---
@@ -105,7 +122,7 @@ class AudioHapticsEngine {
 
   // --- AUDIO SYNTHESIZERS ---
   public playClick() {
-    if (!this.soundEnabled) return;
+    if (!this.soundEnabled || this.volume <= 0) return;
     this.initCtx();
     if (!this.ctx) return;
 
@@ -117,7 +134,7 @@ class AudioHapticsEngine {
       osc.frequency.setValueAtTime(600, this.ctx.currentTime);
       osc.frequency.exponentialRampToValueAtTime(200, this.ctx.currentTime + 0.04);
 
-      gain.gain.setValueAtTime(0.12, this.ctx.currentTime);
+      gain.gain.setValueAtTime(0.12 * this.volume, this.ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.04);
 
       osc.connect(gain);
@@ -131,7 +148,7 @@ class AudioHapticsEngine {
   }
 
   public playCorrect() {
-    if (!this.soundEnabled) return;
+    if (!this.soundEnabled || this.volume <= 0) return;
     this.initCtx();
     if (!this.ctx) return;
 
@@ -146,7 +163,7 @@ class AudioHapticsEngine {
         osc.frequency.setValueAtTime(freq, now + idx * 0.06);
 
         gain.gain.setValueAtTime(0, now + idx * 0.06);
-        gain.gain.linearRampToValueAtTime(0.2, now + idx * 0.06 + 0.02);
+        gain.gain.linearRampToValueAtTime(0.2 * this.volume, now + idx * 0.06 + 0.02);
         gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.06 + 0.15);
 
         osc.connect(gain);
@@ -161,7 +178,7 @@ class AudioHapticsEngine {
   }
 
   public playError() {
-    if (!this.soundEnabled) return;
+    if (!this.soundEnabled || this.volume <= 0) return;
     this.initCtx();
     if (!this.ctx) return;
 
@@ -174,7 +191,7 @@ class AudioHapticsEngine {
       osc.frequency.setValueAtTime(160, now);
       osc.frequency.exponentialRampToValueAtTime(90, now + 0.2);
 
-      gain.gain.setValueAtTime(0.2, now);
+      gain.gain.setValueAtTime(0.2 * this.volume, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
 
       osc.connect(gain);
@@ -188,7 +205,7 @@ class AudioHapticsEngine {
   }
 
   public playTileFlip(freq = 440) {
-    if (!this.soundEnabled) return;
+    if (!this.soundEnabled || this.volume <= 0) return;
     this.initCtx();
     if (!this.ctx) return;
 
@@ -200,7 +217,7 @@ class AudioHapticsEngine {
       osc.type = 'sine';
       osc.frequency.setValueAtTime(freq, now);
 
-      gain.gain.setValueAtTime(0.15, now);
+      gain.gain.setValueAtTime(0.15 * this.volume, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
 
       osc.connect(gain);
@@ -212,7 +229,7 @@ class AudioHapticsEngine {
   }
 
   public playAchievementUnlock() {
-    if (!this.soundEnabled) return;
+    if (!this.soundEnabled || this.volume <= 0) return;
     this.initCtx();
     if (!this.ctx) return;
 
@@ -229,7 +246,7 @@ class AudioHapticsEngine {
         osc.frequency.setValueAtTime(freq, now + idx * 0.08);
 
         gain.gain.setValueAtTime(0, now + idx * 0.08);
-        gain.gain.linearRampToValueAtTime(0.25, now + idx * 0.08 + 0.02);
+        gain.gain.linearRampToValueAtTime(0.25 * this.volume, now + idx * 0.08 + 0.02);
         gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.08 + 0.35);
 
         osc.connect(gain);
@@ -242,7 +259,7 @@ class AudioHapticsEngine {
   }
 
   public playFanfare() {
-    if (!this.soundEnabled) return;
+    if (!this.soundEnabled || this.volume <= 0) return;
     this.initCtx();
     if (!this.ctx) return;
 
@@ -264,7 +281,7 @@ class AudioHapticsEngine {
           osc.frequency.setValueAtTime(freq, now + step * 0.12);
 
           gain.gain.setValueAtTime(0, now + step * 0.12);
-          gain.gain.linearRampToValueAtTime(0.15, now + step * 0.12 + 0.03);
+          gain.gain.linearRampToValueAtTime(0.15 * this.volume, now + step * 0.12 + 0.03);
           gain.gain.exponentialRampToValueAtTime(0.001, now + step * 0.12 + 0.3);
 
           osc.connect(gain);
@@ -278,7 +295,7 @@ class AudioHapticsEngine {
   }
 
   public playPaymentSuccess() {
-    if (!this.soundEnabled) return;
+    if (!this.soundEnabled || this.volume <= 0) return;
     this.initCtx();
     if (!this.ctx) return;
 
@@ -295,7 +312,7 @@ class AudioHapticsEngine {
         osc.frequency.setValueAtTime(freq, now + idx * 0.06);
 
         gain.gain.setValueAtTime(0, now + idx * 0.06);
-        gain.gain.linearRampToValueAtTime(0.3, now + idx * 0.06 + 0.02);
+        gain.gain.linearRampToValueAtTime(0.3 * this.volume, now + idx * 0.06 + 0.02);
         gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.06 + 0.4);
 
         osc.connect(gain);

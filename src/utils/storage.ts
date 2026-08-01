@@ -408,6 +408,7 @@ export const DEFAULT_THEME: ThemeSettings = {
   palette: 'midnight',
   hapticsEnabled: true,
   soundEnabled: true,
+  soundVolume: 80,
   fontSize: 'normal',
   colorBlindMode: false,
   leftHanded: false,

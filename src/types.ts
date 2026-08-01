@@ -165,9 +165,10 @@ export interface Achievement {
 
 export interface ThemeSettings {
   mode: 'midnight' | 'cyber' | 'dark' | 'light';
-  palette: 'midnight' | 'cyber' | 'emerald_matrix' | 'deep_amethyst' | 'solarized_ocean' | 'minimal_light' | 'sunset_ember';
+  palette: 'midnight' | 'cyber' | 'emerald_matrix' | 'deep_amethyst' | 'solarized_ocean' | 'minimal_light' | 'pure_white' | 'soft_snow' | 'sunset_ember';
   hapticsEnabled: boolean;
   soundEnabled: boolean;
+  soundVolume?: number; // 0 to 100 percentage
   fontSize: 'normal' | 'large' | 'xlarge';
   colorBlindMode: boolean;
   leftHanded: boolean;

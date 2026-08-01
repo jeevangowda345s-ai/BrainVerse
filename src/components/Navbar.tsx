@@ -78,15 +78,42 @@ export const Navbar: React.FC<NavbarProps> = ({
     }
   };
 
+  const [showVolumePopover, setShowVolumePopover] = React.useState<boolean>(false);
+
   const themeCycle: Array<ThemeSettings['palette']> = [
     'midnight',
     'cyber',
     'emerald_matrix',
     'deep_amethyst',
     'solarized_ocean',
+    'sunset_ember',
+    'pure_white',
     'minimal_light',
-    'sunset_ember'
+    'soft_snow',
   ];
+
+  const currentVolume = theme.soundVolume !== undefined ? theme.soundVolume : 80;
+
+  const toggleThemeMode = () => {
+    audioHaptics.playClick();
+    audioHaptics.triggerHaptic('tap');
+    setTheme(prev => {
+      const isCurrentlyLight = prev.palette === 'pure_white' || prev.palette === 'minimal_light' || prev.palette === 'soft_snow' || prev.mode === 'light';
+      if (isCurrentlyLight) {
+        return {
+          ...prev,
+          mode: 'midnight',
+          palette: 'midnight',
+        };
+      } else {
+        return {
+          ...prev,
+          mode: 'light',
+          palette: 'pure_white',
+        };
+      }
+    });
+  };
 
   const toggleThemePalette = () => {
     audioHaptics.playClick();
@@ -95,9 +122,10 @@ export const Navbar: React.FC<NavbarProps> = ({
       const currentIdx = themeCycle.indexOf(prev.palette || 'midnight');
       const nextIdx = (currentIdx + 1) % themeCycle.length;
       const nextPalette = themeCycle[nextIdx];
+      const isLight = nextPalette === 'pure_white' || nextPalette === 'minimal_light' || nextPalette === 'soft_snow';
       return {
         ...prev,
-        mode: nextPalette === 'minimal_light' ? 'light' : 'midnight',
+        mode: isLight ? 'light' : 'midnight',
         palette: nextPalette,
       };
     });
@@ -106,10 +134,20 @@ export const Navbar: React.FC<NavbarProps> = ({
   const toggleSound = () => {
     const newSound = !theme.soundEnabled;
     setTheme(prev => ({ ...prev, soundEnabled: newSound }));
-    audioHaptics.setPreferences(newSound, theme.hapticsEnabled);
+    audioHaptics.setPreferences(newSound, theme.hapticsEnabled, currentVolume);
     if (newSound) {
       audioHaptics.playClick();
     }
+  };
+
+  const handleVolumeChange = (volPercent: number) => {
+    setTheme(prev => ({
+      ...prev,
+      soundVolume: volPercent,
+      soundEnabled: volPercent > 0
+    }));
+    audioHaptics.setVolume(volPercent);
+    audioHaptics.setPreferences(volPercent > 0, theme.hapticsEnabled, volPercent);
   };
 
   return (
@@ -199,37 +237,102 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span className="text-xs font-mono font-bold text-purple-300">LVL {user.level}</span>
             </div>
 
-            {/* Quick Access Sound Toggle Button */}
+            {/* Quick Access Manual Sound Control & Volume Slider */}
+            <div className="relative">
+              <button
+                onClick={() => setShowVolumePopover(!showVolumePopover)}
+                className={`flex items-center gap-1.5 px-2.5 py-2 rounded-xl border text-xs font-bold transition-all ${
+                  theme.soundEnabled
+                    ? 'bg-[#00F5FF]/10 border-[#00F5FF]/40 text-[#00F5FF] hover:bg-[#00F5FF]/20 shadow-[0_0_10px_rgba(0,245,255,0.15)]'
+                    : 'bg-[#0A0A0C] border-[#1A1A1A] text-slate-500 hover:text-slate-300 hover:border-slate-700'
+                }`}
+                title="Click to adjust manual volume percentage"
+                aria-label="Adjust Volume"
+              >
+                {theme.soundEnabled && currentVolume > 0 ? (
+                  <>
+                    <Volume2 className="w-4 h-4 text-[#00F5FF]" />
+                    <span className="hidden sm:inline font-mono">{currentVolume}%</span>
+                  </>
+                ) : (
+                  <>
+                    <VolumeX className="w-4 h-4 text-slate-500" />
+                    <span className="hidden sm:inline text-slate-500">Muted</span>
+                  </>
+                )}
+              </button>
+
+              {/* Volume Slider Dropdown Popover */}
+              {showVolumePopover && (
+                <div className="absolute right-0 mt-2 w-56 p-3 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl z-50 space-y-2 animate-fade-in text-white">
+                  <div className="flex items-center justify-between text-xs font-extrabold">
+                    <span className="text-cyan-400 flex items-center gap-1">
+                      <Volume2 className="w-3.5 h-3.5" /> Manual Volume
+                    </span>
+                    <span className="font-mono text-cyan-300 bg-cyan-500/20 px-2 py-0.5 rounded text-[10px]">
+                      {theme.soundEnabled ? `${currentVolume}%` : 'Muted'}
+                    </span>
+                  </div>
+
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="1"
+                    value={theme.soundEnabled ? currentVolume : 0}
+                    onChange={(e) => handleVolumeChange(Number(e.target.value))}
+                    className="w-full accent-cyan-400 bg-slate-800 rounded-lg h-2 cursor-pointer"
+                  />
+
+                  <div className="flex items-center justify-between pt-1 border-t border-slate-800 text-[10px]">
+                    <button
+                      onClick={toggleSound}
+                      className="text-slate-400 hover:text-white font-bold"
+                    >
+                      {theme.soundEnabled ? 'Mute Sound' : 'Unmute Sound'}
+                    </button>
+                    <button
+                      onClick={() => setShowVolumePopover(false)}
+                      className="text-cyan-400 hover:text-cyan-300 font-bold"
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Quick Sun/Moon White Mode vs Dark Mode Switch Button */}
             <button
-              onClick={toggleSound}
+              onClick={toggleThemeMode}
               className={`flex items-center gap-1.5 px-2.5 py-2 rounded-xl border text-xs font-bold transition-all ${
-                theme.soundEnabled
-                  ? 'bg-[#00F5FF]/10 border-[#00F5FF]/40 text-[#00F5FF] hover:bg-[#00F5FF]/20 shadow-[0_0_10px_rgba(0,245,255,0.15)]'
-                  : 'bg-[#0A0A0C] border-[#1A1A1A] text-slate-500 hover:text-slate-300 hover:border-slate-700'
+                theme.palette === 'pure_white' || theme.palette === 'minimal_light' || theme.palette === 'soft_snow' || theme.mode === 'light'
+                  ? 'bg-amber-400/20 border-amber-400/60 text-amber-300 shadow-[0_0_10px_rgba(251,191,36,0.2)]'
+                  : 'bg-indigo-500/10 border-indigo-500/40 text-indigo-300 hover:bg-indigo-500/20'
               }`}
-              title={theme.soundEnabled ? 'Mute Sound Effects' : 'Enable Sound Effects'}
-              aria-label={theme.soundEnabled ? 'Mute Sound Effects' : 'Enable Sound Effects'}
+              title="Quick Toggle: White Mode vs Dark Mode"
             >
-              {theme.soundEnabled ? (
+              {theme.palette === 'pure_white' || theme.palette === 'minimal_light' || theme.palette === 'soft_snow' || theme.mode === 'light' ? (
                 <>
-                  <Volume2 className="w-4 h-4 text-[#00F5FF]" />
-                  <span className="hidden sm:inline">Sound</span>
+                  <Sun className="w-4 h-4 text-amber-400" />
+                  <span className="hidden lg:inline text-amber-300">White</span>
                 </>
               ) : (
                 <>
-                  <VolumeX className="w-4 h-4 text-slate-500" />
-                  <span className="hidden sm:inline text-slate-500">Muted</span>
+                  <Moon className="w-4 h-4 text-indigo-400" />
+                  <span className="hidden lg:inline text-indigo-300">Dark</span>
                 </>
               )}
             </button>
 
+            {/* Theme Palette Cycling Button */}
             <button
               onClick={toggleThemePalette}
               className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl bg-[#0A0A0C] border border-[#1A1A1A] text-xs font-bold hover:border-cyan-500/40 transition-all"
-              title="Click to cycle theme palette"
+              title="Click to cycle through all 9 color palettes"
             >
               <Palette className="w-4 h-4 text-purple-400" />
-              <span className="hidden md:inline capitalize text-slate-300">
+              <span className="hidden xl:inline capitalize text-slate-300">
                 {theme.palette ? theme.palette.replace('_', ' ') : 'Midnight'}
               </span>
             </button>

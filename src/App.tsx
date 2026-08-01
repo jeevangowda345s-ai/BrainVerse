@@ -463,7 +463,7 @@ export default function App() {
   const themeConfig = getThemeConfig(theme.palette);
 
   return (
-    <div className={`min-h-screen font-sans ${themeConfig.bgClass} bg-grid-pattern transition-colors duration-300`}>
+    <div className={`min-h-screen w-full overflow-x-hidden font-sans ${themeConfig.bgClass} bg-grid-pattern transition-colors duration-300`}>
       
       {/* First-Time Onboarding Popup */}
       {!user.isOnboarded && (
