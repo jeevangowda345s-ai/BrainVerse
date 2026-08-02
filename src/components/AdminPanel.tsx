@@ -785,19 +785,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               {/* Merchant Details Inputs */}
               <div className="grid grid-cols-2 gap-3 pt-2">
                 <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold text-slate-300">Merchant UPI ID</label>
-                    <button
-                      type="button"
-                      onClick={() => setShowAdminMerchantUpi(!showAdminMerchantUpi)}
-                      className="text-[10px] text-slate-400 hover:text-amber-300 font-bold flex items-center gap-1"
-                    >
-                      {showAdminMerchantUpi ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                      <span>{showAdminMerchantUpi ? 'Hide' : 'Show'}</span>
-                    </button>
-                  </div>
+                  <label className="text-xs font-bold text-slate-300">Merchant UPI ID (Hidden)</label>
                   <input
-                    type={showAdminMerchantUpi ? "text" : "password"}
+                    type="password"
                     value={qrConfig.upiId}
                     onChange={(e) => setQrConfig(prev => ({ ...prev, upiId: e.target.value }))}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs font-mono font-bold text-amber-400 focus:outline-none"
@@ -878,18 +868,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   <div className="w-52 h-52 flex flex-col items-center justify-center bg-slate-100 rounded-lg text-slate-700 text-xs font-mono gap-2 p-2">
                     <QrCode className="w-16 h-16 text-[#5f259f]" />
                     <span className="font-bold">Auto Generated UPI QR</span>
-                    <span className="text-[10px] text-slate-500 truncate max-w-full">
-                      {showAdminMerchantUpi ? qrConfig.upiId : maskUpiId(qrConfig.upiId)}
-                    </span>
+                    <span className="text-[10px] text-emerald-600 font-bold truncate max-w-full">Official NPCI Scanner QR</span>
                   </div>
                 )}
               </div>
 
               <div className="space-y-1 text-xs">
                 <div className="text-white font-bold">{qrConfig.merchantName}</div>
-                <div className="text-amber-400 font-mono text-[11px]">
-                  {showAdminMerchantUpi ? qrConfig.upiId : maskUpiId(qrConfig.upiId)}
-                </div>
+                <div className="text-emerald-400 font-mono text-[11px]">Official Merchant Scanner Verified</div>
               </div>
 
               {qrSaveMsg && (
@@ -1374,20 +1360,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
                     <div>
-                      <div className="flex items-center justify-between gap-1 text-[10px] text-slate-500">
-                        <span>UPI Destination:</span>
-                        <button
-                          type="button"
-                          onClick={() => setRevealedRedemptions(prev => ({ ...prev, [rec.id]: !prev[rec.id] }))}
-                          className="text-slate-500 hover:text-cyan-300 transition flex items-center gap-0.5"
-                          title={revealedRedemptions[rec.id] ? "Hide UPI" : "Show UPI"}
-                        >
-                          {revealedRedemptions[rec.id] ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                        </button>
-                      </div>
-                      <div className="font-mono text-cyan-300 font-bold">
-                        {revealedRedemptions[rec.id] ? rec.payoutDestination : maskUpiId(rec.payoutDestination)}
-                      </div>
+                      <span className="text-slate-500 text-[10px]">UPI Destination:</span>
+                      <div className="font-mono text-cyan-300 font-bold">{rec.payoutDestination}</div>
                     </div>
 
                     <div>

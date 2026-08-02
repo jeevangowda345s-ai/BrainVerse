@@ -449,15 +449,6 @@ export const GamificationHub: React.FC<GamificationHubProps> = ({
                 </div>
                 <div className="text-xs text-slate-300 pt-1 flex items-center justify-center gap-1.5 flex-wrap">
                   <span>Merchant: <strong className="text-white">{MERCHANT_NAME}</strong></span>
-                  <span className="font-mono text-amber-400 font-bold">({revealUpi ? UPI_ID : maskUpiId(UPI_ID)})</span>
-                  <button
-                    type="button"
-                    onClick={() => setRevealUpi(!revealUpi)}
-                    className="p-1 text-slate-400 hover:text-amber-300 transition"
-                    title={revealUpi ? "Hide UPI ID" : "Show UPI ID"}
-                  >
-                    {revealUpi ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                  </button>
                 </div>
                 <div className="text-[11px] text-emerald-400 font-semibold flex items-center justify-center gap-1 mt-1">
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> NPCI Instant UPI Merchant Verification
@@ -484,22 +475,14 @@ export const GamificationHub: React.FC<GamificationHubProps> = ({
                   <span>Scan QR using any UPI App</span>
                 </div>
 
-                {/* Quick Copy UPI & Pay App buttons */}
-                <div className="flex items-center justify-center gap-2">
-                  <button
-                    type="button"
-                    onClick={handleCopyUpi}
-                    className="px-3.5 py-1.5 rounded-xl bg-slate-800 border border-slate-700 hover:border-purple-500/50 text-xs font-bold text-slate-200 transition flex items-center gap-1.5"
-                  >
-                    {copiedUpi ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-purple-400" />}
-                    <span>{copiedUpi ? 'UPI ID Copied!' : 'Copy UPI ID'}</span>
-                  </button>
-
+                {/* Pay App button */}
+                <div className="flex items-center justify-center">
                   <a
                     href={UPI_PAY_URL}
-                    className="px-3.5 py-1.5 rounded-xl bg-purple-500/20 border border-purple-500/40 text-purple-300 hover:bg-purple-500/30 text-xs font-bold transition flex items-center gap-1.5"
+                    className="px-5 py-2 rounded-xl bg-purple-500/20 border border-purple-500/40 text-purple-300 hover:bg-purple-500/30 text-xs font-bold transition flex items-center gap-2 shadow-sm"
                   >
-                    <span>Pay via UPI App</span>
+                    <Zap className="w-3.5 h-3.5 text-amber-300" />
+                    <span>Pay via Any UPI App</span>
                   </a>
                 </div>
               </div>
