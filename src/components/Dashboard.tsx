@@ -66,6 +66,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     onSelectGame(gameId);
   };
 
+  const isMasterAdminEmail = Boolean(user.email && user.email.toLowerCase().trim() === 'jeevangowda345s@gmail.com');
   const isRegisteredAccountLogin = Boolean(user.email && user.isReturningUser !== false && !user.isGuest);
 
   return (
@@ -120,7 +121,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 </div>
 
                 <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
-                  {isRegisteredAccountLogin ? (
+                  {isMasterAdminEmail ? (
+                    <>Welcome back <span className="text-[#00F5FF]">Admin👑</span></>
+                  ) : isRegisteredAccountLogin ? (
                     <>Welcome back to <span className="text-[#00F5FF]">Jeevu's explorer!!</span></>
                   ) : (
                     <>Welcome to <span className="text-[#00F5FF]">Jeevu's explorer!!</span></>
