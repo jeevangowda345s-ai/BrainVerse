@@ -16,13 +16,15 @@ import {
   Star,
   Award,
   RotateCw,
-  Gift
+  Gift,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import confetti from 'canvas-confetti';
 import { UserProfile, ProUpgradeRequest } from '../types';
 import { audioHaptics } from '../utils/audioHaptics';
-import { loadQRMerchantConfig, saveUserProfile, saveProUpgradeRequest } from '../utils/storage';
+import { loadQRMerchantConfig, saveUserProfile, saveProUpgradeRequest, maskUpiId } from '../utils/storage';
 import { saveUserProfileToFirestore, submitProUpgradeRequestToFirestore } from '../services/firebaseService';
 
 interface PremiumMembershipModalProps {
@@ -39,6 +41,7 @@ export const PremiumMembershipModal: React.FC<PremiumMembershipModalProps> = ({
   onUpdateUser,
 }) => {
   const [copiedUpi, setCopiedUpi] = useState(false);
+  const [revealUpi, setRevealUpi] = useState(false);
   const [copiedAmount, setCopiedAmount] = useState(false);
   const [utrNumber, setUtrNumber] = useState('');
   const [utrError, setUtrError] = useState<string | null>(null);
@@ -329,15 +332,28 @@ export const PremiumMembershipModal: React.FC<PremiumMembershipModalProps> = ({
               <div className="p-3.5 rounded-2xl bg-slate-900 border border-amber-500/30 space-y-1.5">
                 <div className="flex items-center justify-between">
                   <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Merchant UPI ID</span>
-                  <button
-                    onClick={handleCopyUpi}
-                    className="text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1 text-[10px]"
-                  >
-                    {copiedUpi ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                    <span>{copiedUpi ? 'Copied' : 'Copy UPI ID'}</span>
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setRevealUpi(!revealUpi)}
+                      className="text-slate-400 hover:text-amber-300 font-bold flex items-center gap-1 text-[10px]"
+                      title={revealUpi ? "Hide UPI ID" : "Show UPI ID"}
+                    >
+                      {revealUpi ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                      <span>{revealUpi ? 'Hide' : 'Show'}</span>
+                    </button>
+                    <button
+                      onClick={handleCopyUpi}
+                      className="text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1 text-[10px]"
+                    >
+                      {copiedUpi ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                      <span>{copiedUpi ? 'Copied' : 'Copy UPI ID'}</span>
+                    </button>
+                  </div>
                 </div>
-                <div className="font-mono font-black text-amber-400 text-sm tracking-wide">{merchantUpi}</div>
+                <div className="font-mono font-black text-amber-400 text-sm tracking-wide">
+                  {revealUpi ? merchantUpi : maskUpiId(merchantUpi)}
+                </div>
               </div>
 
               <div className="p-3.5 rounded-2xl bg-slate-900 border border-emerald-500/30 space-y-2">

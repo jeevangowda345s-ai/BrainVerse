@@ -21,11 +21,13 @@ import {
   History,
   Info,
   RefreshCw,
-  Zap
+  Zap,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { UserProfile, RedemptionRecord } from '../types';
 import { audioHaptics } from '../utils/audioHaptics';
-import { loadQRMerchantConfig } from '../utils/storage';
+import { loadQRMerchantConfig, maskUpiId } from '../utils/storage';
 
 interface RedeemCashModalProps {
   isOpen: boolean;
@@ -62,6 +64,9 @@ export const RedeemCashModal: React.FC<RedeemCashModalProps> = ({
   const [isVerifying, setIsVerifying] = useState<boolean>(false);
   const [verificationStep, setVerificationStep] = useState<string>('');
   const [copiedUpi, setCopiedUpi] = useState<boolean>(false);
+  const [revealMerchantUpi, setRevealMerchantUpi] = useState<boolean>(false);
+  const [revealMyUpi, setRevealMyUpi] = useState<boolean>(false);
+  const [showInputUpi, setShowInputUpi] = useState<boolean>(false);
   const [copiedRecordId, setCopiedRecordId] = useState<string | null>(null);
   const [latestReceipt, setLatestReceipt] = useState<RedemptionRecord | null>(null);
   const [errorMsg, setErrorMsg] = useState<string>('');
@@ -398,8 +403,20 @@ export const RedeemCashModal: React.FC<RedeemCashModalProps> = ({
                         <div className="font-bold text-amber-400">{rec.coinsRedeemed.toLocaleString()}</div>
                       </div>
                       <div>
-                        <div className="text-[10px] text-slate-500">DESTINATION</div>
-                        <div className="font-bold text-cyan-400 truncate">{rec.payoutDestination}</div>
+                        <div className="text-[10px] text-slate-500 flex items-center justify-between gap-1">
+                          <span>DESTINATION</span>
+                          <button
+                            type="button"
+                            onClick={() => setRevealMyUpi(!revealMyUpi)}
+                            className="text-slate-500 hover:text-cyan-300 transition"
+                            title={revealMyUpi ? "Hide UPI ID" : "Show UPI ID"}
+                          >
+                            {revealMyUpi ? <EyeOff className="w-2.5 h-2.5" /> : <Eye className="w-2.5 h-2.5" />}
+                          </button>
+                        </div>
+                        <div className="font-bold text-cyan-400 truncate">
+                          {revealMyUpi ? rec.payoutDestination : maskUpiId(rec.payoutDestination)}
+                        </div>
                       </div>
                       <div>
                         <div className="text-[10px] text-slate-500">UTR REF</div>
@@ -511,13 +528,23 @@ export const RedeemCashModal: React.FC<RedeemCashModalProps> = ({
               </div>
 
               {paymentMethod === 'upi' && (
-                <input
-                  type="text"
-                  value={upiId}
-                  onChange={(e) => setUpiId(e.target.value)}
-                  placeholder="Enter your UPI ID (e.g. name@upi or mobile@paytm)"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-3 text-xs text-white focus:border-cyan-500 focus:outline-none"
-                />
+                <div className="relative flex items-center">
+                  <input
+                    type={showInputUpi ? "text" : "password"}
+                    value={upiId}
+                    onChange={(e) => setUpiId(e.target.value)}
+                    placeholder="Enter your UPI ID (e.g. name@upi or mobile@paytm)"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-2xl pl-4 pr-10 py-3 text-xs text-white focus:border-cyan-500 focus:outline-none font-mono"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowInputUpi(!showInputUpi)}
+                    className="absolute right-3 text-slate-400 hover:text-cyan-300 transition"
+                    title={showInputUpi ? "Hide UPI ID" : "Show UPI ID"}
+                  >
+                    {showInputUpi ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
               )}
 
               {paymentMethod === 'bank' && (
@@ -606,8 +633,16 @@ export const RedeemCashModal: React.FC<RedeemCashModalProps> = ({
                     <span>{merchantName}</span>
                     <ShieldCheck className="w-4 h-4 text-emerald-400" />
                   </div>
-                  <div className="text-[11px] text-purple-300 font-mono font-bold">
-                    UPI ID: {merchantUpi} • ₹{redemptionFeeINR}.00 Verification Fee
+                  <div className="text-[11px] text-purple-300 font-mono font-bold flex items-center justify-center gap-1.5">
+                    <span>UPI ID: {revealMerchantUpi ? merchantUpi : maskUpiId(merchantUpi)} • ₹{redemptionFeeINR}.00 Verification Fee</span>
+                    <button
+                      type="button"
+                      onClick={() => setRevealMerchantUpi(!revealMerchantUpi)}
+                      className="text-slate-400 hover:text-purple-300 transition"
+                      title={revealMerchantUpi ? "Hide Merchant UPI ID" : "Show Merchant UPI ID"}
+                    >
+                      {revealMerchantUpi ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
                   </div>
                 </div>
 

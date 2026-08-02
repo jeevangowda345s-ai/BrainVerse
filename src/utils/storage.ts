@@ -576,3 +576,28 @@ export function saveProUpgradeRequest(req: ProUpgradeRequest): void {
   }
   localStorage.setItem(PRO_REQUESTS_KEY, JSON.stringify(list));
 }
+
+export function maskUpiId(upi: string): string {
+  if (!upi) return '';
+  const prefixMatch = upi.match(/^(UPI:\s*)(.*)$/i);
+  const prefix = prefixMatch ? prefixMatch[1] : '';
+  const cleanUpi = (prefixMatch ? prefixMatch[2] : upi).trim();
+
+  const parts = cleanUpi.split('@');
+  if (parts.length === 2) {
+    const username = parts[0];
+    const handle = parts[1];
+    if (username.length <= 2) {
+      return `${prefix}${username.substring(0, 1)}*@${handle}`;
+    }
+    const visibleStart = username.substring(0, 2);
+    const visibleEnd = username.substring(username.length - 1);
+    const maskedLen = Math.max(3, username.length - 3);
+    const asterisks = '*'.repeat(maskedLen);
+    return `${prefix}${visibleStart}${asterisks}${visibleEnd}@${handle}`;
+  }
+  if (cleanUpi.length > 5) {
+    return `${prefix}${cleanUpi.substring(0, 2)}****${cleanUpi.substring(cleanUpi.length - 2)}`;
+  }
+  return `${prefix}********`;
+}

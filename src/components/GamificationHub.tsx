@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Gift, Award, Flame, Sparkles, CheckCircle2, RotateCw, Trophy, Zap, Coins, X, ShieldCheck, Lock, Copy, Check, QrCode, AlertCircle, Loader2, Smartphone, ExternalLink } from 'lucide-react';
+import { Gift, Award, Flame, Sparkles, CheckCircle2, RotateCw, Trophy, Zap, Coins, X, ShieldCheck, Lock, Copy, Check, QrCode, AlertCircle, Loader2, Smartphone, ExternalLink, Eye, EyeOff } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import QRCode from 'qrcode';
 import { UserProfile, DailyMission, Achievement } from '../types';
 import { audioHaptics } from '../utils/audioHaptics';
-import { loadQRMerchantConfig } from '../utils/storage';
+import { loadQRMerchantConfig, maskUpiId } from '../utils/storage';
 
 export interface WheelReward {
   label: string;
@@ -58,6 +58,7 @@ export const GamificationHub: React.FC<GamificationHubProps> = ({
   const [verifyingPayment, setVerifyingPayment] = useState<boolean>(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [copiedUpi, setCopiedUpi] = useState<boolean>(false);
+  const [revealUpi, setRevealUpi] = useState<boolean>(false);
 
   const todayStr = new Date().toISOString().split('T')[0];
   const hasSpunToday = user.lastWheelSpinDate === todayStr;
@@ -446,8 +447,17 @@ export const GamificationHub: React.FC<GamificationHubProps> = ({
                 <div className="text-3xl font-black text-amber-400 font-mono">
                   ₹{SPIN_FEE_INR}.00 <span className="text-xs text-slate-300 font-sans font-normal">INR</span>
                 </div>
-                <div className="text-xs text-slate-300 pt-1">
-                  Merchant: <strong className="text-white">{MERCHANT_NAME}</strong> ({UPI_ID})
+                <div className="text-xs text-slate-300 pt-1 flex items-center justify-center gap-1.5 flex-wrap">
+                  <span>Merchant: <strong className="text-white">{MERCHANT_NAME}</strong></span>
+                  <span className="font-mono text-amber-400 font-bold">({revealUpi ? UPI_ID : maskUpiId(UPI_ID)})</span>
+                  <button
+                    type="button"
+                    onClick={() => setRevealUpi(!revealUpi)}
+                    className="p-1 text-slate-400 hover:text-amber-300 transition"
+                    title={revealUpi ? "Hide UPI ID" : "Show UPI ID"}
+                  >
+                    {revealUpi ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  </button>
                 </div>
                 <div className="text-[11px] text-emerald-400 font-semibold flex items-center justify-center gap-1 mt-1">
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> NPCI Instant UPI Merchant Verification
