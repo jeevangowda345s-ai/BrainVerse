@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   ShieldAlert, 
   Lock, 
@@ -182,21 +182,45 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     };
   }, [isAdminUnlocked]);
 
-  // Sync edit state whenever selected target user changes or user list updates
+  const loadedUserIdRef = useRef<string>('');
+
+  // Sync edit state ONLY when selected target user actually changes
   useEffect(() => {
     const target = allRegisteredUsers.find(u => u.id === selectedUserId) || user;
     if (target) {
-      const isTargetMaster = Boolean(target.email && target.email.toLowerCase().trim() === MASTER_ADMIN_EMAIL.toLowerCase());
-      setEditingCoins(target.coins || 0);
-      setEditingBrainScore(target.brainScore || 0);
-      setEditingDiamonds(target.diamonds || 0);
-      setEditingLevel(target.level || 1);
-      setEditingStreak(target.streak || 1);
-      setEditingXp(target.xp || 0);
-      setEditingIsPremium(isTargetMaster); // STRICT: Only master admin can be PRO VIP
-      setEditingIsAdmin(isTargetMaster); // STRICT: Only master admin can be Admin
+      if (loadedUserIdRef.current !== target.id) {
+        loadedUserIdRef.current = target.id;
+        const isTargetMaster = Boolean(target.email && target.email.toLowerCase().trim() === MASTER_ADMIN_EMAIL.toLowerCase());
+        setEditingCoins(target.coins ?? 0);
+        setEditingBrainScore(target.brainScore ?? 0);
+        setEditingDiamonds(target.diamonds ?? 0);
+        setEditingLevel(target.level ?? 1);
+        setEditingStreak(target.streak ?? 1);
+        setEditingXp(target.xp ?? 0);
+        setEditingIsPremium(isTargetMaster); // STRICT: Only master admin can be PRO VIP
+        setEditingIsAdmin(isTargetMaster); // STRICT: Only master admin can be Admin
+      }
     }
   }, [selectedUserId, allRegisteredUsers, user]);
+
+  // Force reload target user stats from latest user object
+  const handleReloadTargetUserStats = () => {
+    const target = allRegisteredUsers.find(u => u.id === selectedUserId) || selectedUser;
+    if (target) {
+      loadedUserIdRef.current = target.id;
+      const isTargetMaster = Boolean(target.email && target.email.toLowerCase().trim() === MASTER_ADMIN_EMAIL.toLowerCase());
+      setEditingCoins(target.coins ?? 0);
+      setEditingBrainScore(target.brainScore ?? 0);
+      setEditingDiamonds(target.diamonds ?? 0);
+      setEditingLevel(target.level ?? 1);
+      setEditingStreak(target.streak ?? 1);
+      setEditingXp(target.xp ?? 0);
+      setEditingIsPremium(isTargetMaster);
+      setEditingIsAdmin(isTargetMaster);
+      setUserSaveMsg(`Reloaded latest stats for "${target.name || 'User'}"`);
+      setTimeout(() => setUserSaveMsg(null), 2500);
+    }
+  };
 
   // Redemption History Management
   const [redemptions, setRedemptions] = useState<RedemptionRecord[]>(user.redemptionHistory || []);
@@ -268,36 +292,57 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   // Save Selected User Balance & Account Updates to Firestore
   const handleSaveUserAccount = async () => {
+    if (!isMasterAdminEmail) {
+      alert(`Access Denied: Only Master Admin (${MASTER_ADMIN_EMAIL}) has permission to modify user balances.`);
+      return;
+    }
+
     const target = allRegisteredUsers.find(u => u.id === selectedUserId) || selectedUser;
-    if (!target || !target.id) return;
+    if (!target || !target.id) {
+      alert("Error: No user selected.");
+      return;
+    }
 
     const isTargetMaster = Boolean(target.email && target.email.toLowerCase().trim() === MASTER_ADMIN_EMAIL.toLowerCase());
 
     const updatedFields: Partial<UserProfile> = {
-      coins: editingCoins,
-      brainScore: editingBrainScore,
-      diamonds: editingDiamonds,
-      level: editingLevel,
-      streak: editingStreak,
-      xp: editingXp,
+      coins: Math.max(0, Number(editingCoins) || 0),
+      brainScore: Math.max(0, Number(editingBrainScore) || 0),
+      diamonds: Math.max(0, Number(editingDiamonds) || 0),
+      level: Math.max(1, Number(editingLevel) || 1),
+      streak: Math.max(0, Number(editingStreak) || 0),
+      xp: Math.max(0, Number(editingXp) || 0),
       isPremium: isTargetMaster, // STRICT: Only jeevangowda345s@gmail.com is PRO VIP
       isAdmin: isTargetMaster, // STRICT: Only jeevangowda345s@gmail.com is Admin
     };
 
-    // Save directly to Firestore for target user
-    await adminUpdateUserProfileInFirestore(target.id, updatedFields);
+    try {
+      // Save directly to Firestore for target user
+      await adminUpdateUserProfileInFirestore(target.id, updatedFields);
 
-    // If target is current logged-in session user, update local session as well
-    if (target.id === user.id) {
-      const updatedUser = { ...user, ...updatedFields };
-      if (onUpdateUser) onUpdateUser(updatedUser);
-      saveUserProfile(updatedUser);
+      // Instantly update user in local registry list
+      setAllRegisteredUsers(prevList =>
+        prevList.map(u => u.id === target.id ? { ...u, ...updatedFields } : u)
+      );
+
+      // Keep loaded ref in sync so form doesn't reset
+      loadedUserIdRef.current = target.id;
+
+      // If target is current logged-in session user, update local session as well
+      if (target.id === user.id) {
+        const updatedUser = { ...user, ...updatedFields };
+        if (onUpdateUser) onUpdateUser(updatedUser);
+        saveUserProfile(updatedUser);
+      }
+
+      audioHaptics.playFanfare();
+      audioHaptics.triggerHaptic('levelUp');
+      setUserSaveMsg(`Account & Balances Updated Successfully for "${target.name || 'User'}" (${target.email || target.id})!`);
+      setTimeout(() => setUserSaveMsg(null), 3500);
+    } catch (err) {
+      console.error('Error saving user account updates:', err);
+      alert("Failed to save account changes to Firestore. Please check your network connection.");
     }
-
-    audioHaptics.playFanfare();
-    audioHaptics.triggerHaptic('levelUp');
-    setUserSaveMsg(`Account & Balances Updated Successfully for "${target.name || 'User'}"!`);
-    setTimeout(() => setUserSaveMsg(null), 3500);
   };
 
   // Manual Purge button action for Admin
@@ -1056,6 +1101,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 >
                   <Crown className="w-3.5 h-3.5" />
                   {editingIsPremium ? 'PRO VIP MEMBER' : 'PRO (ADMIN ONLY)'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleReloadTargetUserStats}
+                  className="px-3 py-1.5 rounded-xl bg-slate-800 text-slate-300 border border-slate-700 text-xs font-bold hover:bg-slate-700 transition flex items-center gap-1"
+                  title="Reload original stats from database for selected user"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" /> Reload Stats
                 </button>
 
                 <button

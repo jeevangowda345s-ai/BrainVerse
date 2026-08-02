@@ -124,6 +124,7 @@ export async function adminUpdateUserProfileInFirestore(targetUserId: string, up
     }, { merge: true });
   } catch (err) {
     console.error('Failed to admin update user in Firestore:', err);
+    throw err;
   }
 }
 
