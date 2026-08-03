@@ -594,45 +594,35 @@ export const RedeemCashModal: React.FC<RedeemCashModalProps> = ({
                   </div>
                 </div>
 
-                {/* Clean, High-Contrast QR Code Container for PhonePe Scanner */}
-                <div className="relative w-64 h-64 mx-auto bg-white p-3 rounded-2xl shadow-2xl flex items-center justify-center border-4 border-[#5f259f]">
-                  {qrDataUrl ? (
-                    <img src={qrDataUrl} alt="PhonePe QR Code Jeevan M S" className="w-full h-full object-contain" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-slate-400 font-mono text-xs">
-                      Generating QR...
+                {/* Spotify Style Direct Payment Link Card */}
+                <div className="p-6 rounded-2xl bg-gradient-to-br from-slate-950 via-slate-900 to-purple-950/60 border border-purple-500/30 text-center space-y-4 shadow-xl">
+                  <div className="space-y-1">
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-black uppercase tracking-widest">
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Direct Payment Checkout Link</span>
                     </div>
-                  )}
-                </div>
+                    <h4 className="text-base font-black text-white">{merchantName}</h4>
+                    <div className="text-2xl font-black text-amber-400 font-mono">
+                      ₹{redemptionFeeINR}.00 <span className="text-xs text-slate-400 font-sans font-normal">INR Verification Fee</span>
+                    </div>
+                  </div>
 
-                {/* Merchant Name below QR */}
-                <div className="pt-1 space-y-0.5">
-                  <div className="text-base font-black text-white tracking-wide flex items-center justify-center gap-1.5">
-                    <span>{merchantName}</span>
-                    <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                  </div>
-                  <div className="text-[11px] text-purple-300 font-mono font-bold">
-                    ₹{redemptionFeeINR}.00 Verification Fee
-                  </div>
-                </div>
-
-                {/* UPI Option below the scanner */}
-                <div className="pt-2 border-t border-slate-800/80 space-y-2">
-                  <div className="text-[11px] font-extrabold text-purple-300 uppercase tracking-wider">
-                    Pay via UPI App:
-                  </div>
-                  
-                  <button
-                    type="button"
-                    onClick={() => {
-                      audioHaptics.playClick();
-                      window.location.href = upiPayString;
-                    }}
-                    className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs transition flex items-center justify-center gap-2 shadow-md"
+                  {/* Direct Checkout Button */}
+                  <a
+                    href={qrConfig.paymentLink || upiPayString}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => audioHaptics.playClick()}
+                    className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-500 hover:from-purple-500 hover:to-indigo-500 text-white font-black text-xs uppercase tracking-wider transition shadow-lg shadow-purple-500/20 flex items-center justify-center gap-2 group"
                   >
-                    <Zap className="w-4 h-4 text-amber-300" />
-                    <span>Pay via Any UPI App</span>
-                  </button>
+                    <Zap className="w-4 h-4 text-amber-300 fill-amber-300" />
+                    <span>Pay via Direct Checkout Link</span>
+                    <ExternalLink className="w-3.5 h-3.5 text-purple-200 group-hover:translate-x-0.5 transition-transform" />
+                  </a>
+
+                  <p className="text-[10px] text-slate-400">
+                    Clicking opens direct secure checkout to process ₹{redemptionFeeINR} INR verification fee.
+                  </p>
                 </div>
 
               </div>

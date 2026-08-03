@@ -39,7 +39,8 @@ import {
   Shield,
   Filter,
   Eye,
-  EyeOff
+  EyeOff,
+  Copy
 } from 'lucide-react';
 import { UserProfile, QRMerchantConfig, RedemptionRecord, ProUpgradeRequest } from '../types';
 import { audioHaptics } from '../utils/audioHaptics';
@@ -77,7 +78,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [keyError, setKeyError] = useState<string | null>(null);
 
   // Active Admin Tab
-  const [activeAdminTab, setActiveAdminTab] = useState<'qr_upload' | 'users' | 'redemptions' | 'utr_approvals' | 'version'>('utr_approvals');
+  const [activeAdminTab, setActiveAdminTab] = useState<'scanner_payers' | 'qr_upload' | 'users' | 'redemptions' | 'utr_approvals' | 'version'>('scanner_payers');
+
+  // Scanner Payers List Filters & Search State
+  const [scannerSearchQuery, setScannerSearchQuery] = useState<string>('');
+  const [scannerTypeFilter, setScannerTypeFilter] = useState<'all' | 'PRO_MEMBERSHIP' | 'WHEEL_SPIN_FEE' | 'REDEMPTION_FEE'>('all');
+  const [scannerStatusFilter, setScannerStatusFilter] = useState<'all' | 'pending' | 'approved' | 'declined'>('all');
+  const [copiedUtrId, setCopiedUtrId] = useState<string | null>(null);
+
+  const handleCopyText = (text: string, id: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedUtrId(id);
+    setTimeout(() => setCopiedUtrId(null), 2000);
+  };
 
   // UTR & PRO Verification Management State
   const [proRequests, setProRequests] = useState<ProUpgradeRequest[]>([]);
@@ -492,6 +505,23 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       {/* Admin Navigation Tabs */}
       <div className="flex overflow-x-auto gap-2 p-1.5 rounded-2xl bg-slate-900 border border-slate-800 scrollbar-none">
         <button
+          onClick={() => { setActiveAdminTab('scanner_payers'); loadAllProRequests(); }}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${
+            activeAdminTab === 'scanner_payers'
+              ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/20 font-black'
+              : 'text-emerald-400 hover:text-white hover:bg-slate-800'
+          }`}
+        >
+          <QrCode className="w-4 h-4 text-emerald-300" />
+          <span>Scanner Payers List</span>
+          {proRequests.length > 0 && (
+            <span className="px-1.5 py-0.5 rounded-full bg-emerald-500 text-slate-950 text-[10px] font-black">
+              {proRequests.length}
+            </span>
+          )}
+        </button>
+
+        <button
           onClick={() => { setActiveAdminTab('utr_approvals'); loadAllProRequests(); }}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${
             activeAdminTab === 'utr_approvals'
@@ -516,8 +546,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               : 'text-slate-400 hover:text-white hover:bg-slate-800'
           }`}
         >
-          <QrCode className="w-4 h-4 text-amber-300" />
-          <span>Upload PhonePe QR Scanner</span>
+          <Zap className="w-4 h-4 text-emerald-400" />
+          <span>Payment Link & Gateway Config</span>
         </button>
 
         <button
@@ -556,6 +586,327 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           <span>System & Broadcast</span>
         </button>
       </div>
+
+      {/* TAB: SCANNER PAYERS LIST */}
+      {activeAdminTab === 'scanner_payers' && (
+        <div className="p-6 rounded-3xl bg-slate-900 border border-emerald-500/40 space-y-6 shadow-xl">
+          {/* Section Header */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+            <div>
+              <h2 className="text-lg font-black text-white flex items-center gap-2">
+                <QrCode className="w-5 h-5 text-emerald-400" />
+                Scanner Payers & Scanner Payment Logs
+              </h2>
+              <p className="text-xs text-slate-400">
+                Complete real-time list of all registered users who scanned the merchant QR code and submitted payments in the application.
+              </p>
+            </div>
+
+            <button
+              onClick={loadAllProRequests}
+              className="px-3.5 py-2 rounded-xl bg-slate-800 border border-slate-700 hover:bg-slate-700 text-xs text-slate-200 font-bold flex items-center gap-1.5 transition shrink-0"
+            >
+              <RefreshCw className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Refresh Payers List</span>
+            </button>
+          </div>
+
+          {/* Action Status Toast Message */}
+          {proActionMsg && (
+            <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center gap-2 animate-fade-in">
+              <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+              <span>{proActionMsg}</span>
+            </div>
+          )}
+
+          {/* Aggregated Scanner Payments List */}
+          {(() => {
+            const scannerList: Array<{
+              id: string;
+              userId: string;
+              userName: string;
+              userEmail: string;
+              utrNumber: string;
+              amountINR: number;
+              status: 'pending' | 'approved' | 'declined';
+              timestamp: string;
+              paymentType: 'PRO_MEMBERSHIP' | 'WHEEL_SPIN_FEE' | 'REDEMPTION_FEE';
+              proofUrl?: string;
+              declineReason?: string;
+              rawReq?: ProUpgradeRequest;
+            }> = [];
+
+            const map = new Map<string, typeof scannerList[0]>();
+
+            proRequests.forEach(req => {
+              map.set(req.id, {
+                id: req.id,
+                userId: req.userId,
+                userName: req.userName,
+                userEmail: req.userEmail,
+                utrNumber: req.utrNumber,
+                amountINR: req.amountINR || (req.paymentType === 'WHEEL_SPIN_FEE' ? 5 : 99),
+                status: req.status,
+                timestamp: req.timestamp,
+                paymentType: req.paymentType || 'PRO_MEMBERSHIP',
+                declineReason: req.declineReason,
+                rawReq: req
+              });
+            });
+
+            allRegisteredUsers.forEach(u => {
+              if (u.redemptionHistory) {
+                u.redemptionHistory.forEach(r => {
+                  if (r.utrNumber && r.utrNumber.trim()) {
+                    const redId = `red_${r.id}`;
+                    if (!map.has(redId)) {
+                      map.set(redId, {
+                        id: redId,
+                        userId: u.id,
+                        userName: u.name || r.userName || 'User',
+                        userEmail: u.email || 'No email provided',
+                        utrNumber: r.utrNumber,
+                        amountINR: r.feePaidAmount || 10,
+                        status: r.status === 'REJECTED' ? 'declined' : r.status === 'PENDING_VERIFICATION' ? 'pending' : 'approved',
+                        timestamp: r.timestamp,
+                        paymentType: 'REDEMPTION_FEE',
+                        proofUrl: r.screenshotUrl,
+                        declineReason: r.notes
+                      });
+                    }
+                  }
+                });
+              }
+            });
+
+            const allItems = Array.from(map.values()).sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime());
+
+            const totalRevenue = allItems.reduce((acc, curr) => acc + (curr.amountINR || 0), 0);
+            const pendingCount = allItems.filter(i => i.status === 'pending').length;
+            const approvedCount = allItems.filter(i => i.status === 'approved').length;
+
+            const filtered = allItems.filter(p => {
+              const query = scannerSearchQuery.toLowerCase().trim();
+              const matchesSearch = !query ||
+                p.userName.toLowerCase().includes(query) ||
+                p.userEmail.toLowerCase().includes(query) ||
+                p.utrNumber.toLowerCase().includes(query) ||
+                p.userId.toLowerCase().includes(query);
+              
+              const matchesType = scannerTypeFilter === 'all' || p.paymentType === scannerTypeFilter;
+              const matchesStatus = scannerStatusFilter === 'all' || p.status === scannerStatusFilter;
+
+              return matchesSearch && matchesType && matchesStatus;
+            });
+
+            return (
+              <div className="space-y-5">
+                {/* Metric Cards Summary */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-1">
+                    <div className="text-[11px] font-bold text-slate-400 flex items-center gap-1.5">
+                      <Users className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Total Scanner Payers</span>
+                    </div>
+                    <div className="text-2xl font-black text-white">{allItems.length}</div>
+                    <div className="text-[10px] text-slate-500 font-medium">Scanner payments made</div>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-slate-950 border border-emerald-500/30 space-y-1">
+                    <div className="text-[11px] font-bold text-slate-400 flex items-center gap-1.5">
+                      <IndianRupee className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Total Revenue</span>
+                    </div>
+                    <div className="text-2xl font-black text-emerald-400 font-mono">₹{totalRevenue} INR</div>
+                    <div className="text-[10px] text-emerald-500/80 font-medium font-bold">Collected via QR</div>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-slate-950 border border-amber-500/30 space-y-1">
+                    <div className="text-[11px] font-bold text-slate-400 flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Pending Verification</span>
+                    </div>
+                    <div className="text-2xl font-black text-amber-400">{pendingCount}</div>
+                    <div className="text-[10px] text-amber-500/80 font-medium">Needs Admin action</div>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-slate-950 border border-cyan-500/30 space-y-1">
+                    <div className="text-[11px] font-bold text-slate-400 flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>Verified Payers</span>
+                    </div>
+                    <div className="text-2xl font-black text-cyan-400">{approvedCount}</div>
+                    <div className="text-[10px] text-cyan-500/80 font-medium">Confirmed & Approved</div>
+                  </div>
+                </div>
+
+                {/* Search & Filter Toolbar */}
+                <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 p-3 rounded-2xl bg-slate-950 border border-slate-800">
+                  {/* Search Input */}
+                  <div className="relative flex-1">
+                    <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      placeholder="Search scanner payers by name, email, UTR, or user ID..."
+                      value={scannerSearchQuery}
+                      onChange={(e) => setScannerSearchQuery(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+
+                  {/* Payment Type Filter Dropdown */}
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={scannerTypeFilter}
+                      onChange={(e) => setScannerTypeFilter(e.target.value as any)}
+                      className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs font-bold text-slate-200 focus:outline-none focus:border-emerald-500"
+                    >
+                      <option value="all">All Payment Types</option>
+                      <option value="PRO_MEMBERSHIP">👑 PRO Membership (₹99)</option>
+                      <option value="WHEEL_SPIN_FEE">🎡 Wheel Spin Fee (₹5)</option>
+                      <option value="REDEMPTION_FEE">💸 Redemption Fee (₹10)</option>
+                    </select>
+
+                    {/* Status Filter Dropdown */}
+                    <select
+                      value={scannerStatusFilter}
+                      onChange={(e) => setScannerStatusFilter(e.target.value as any)}
+                      className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs font-bold text-slate-200 focus:outline-none focus:border-emerald-500"
+                    >
+                      <option value="all">All Statuses</option>
+                      <option value="pending">⏳ Pending Verification</option>
+                      <option value="approved">✅ Approved / Verified</option>
+                      <option value="declined">❌ Declined</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Payers List Cards */}
+                <div className="space-y-3">
+                  {filtered.length === 0 ? (
+                    <div className="p-8 rounded-2xl bg-slate-950 border border-slate-800 text-center text-slate-400 space-y-2">
+                      <QrCode className="w-8 h-8 text-emerald-500/40 mx-auto" />
+                      <p className="text-xs font-bold">No scanner payers found matching filters.</p>
+                      <p className="text-[11px] text-slate-500">When users scan the merchant QR code and pay in the app, their UTR logs & account info will appear here.</p>
+                    </div>
+                  ) : (
+                    filtered.map(item => {
+                      const isCopyingThis = copiedUtrId === item.id;
+                      return (
+                        <div
+                          key={item.id}
+                          className={`p-4 sm:p-5 rounded-2xl bg-slate-950 border transition space-y-4 ${
+                            item.status === 'pending'
+                              ? 'border-amber-500/50 shadow-lg shadow-amber-500/5'
+                              : item.status === 'approved'
+                              ? 'border-emerald-500/40'
+                              : 'border-rose-500/30'
+                          }`}
+                        >
+                          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+                            {/* Left: User Profile & Details */}
+                            <div className="flex items-start gap-3">
+                              <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white font-black text-sm shadow-md shrink-0 mt-0.5">
+                                {item.userName ? item.userName.charAt(0).toUpperCase() : 'U'}
+                              </div>
+
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="text-sm font-black text-white">{item.userName}</span>
+                                  <span className="text-xs text-slate-400 font-mono">({item.userEmail})</span>
+                                  
+                                  {/* Payment Category Pill */}
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                                    item.paymentType === 'PRO_MEMBERSHIP'
+                                      ? 'bg-amber-500/20 border border-amber-500/40 text-amber-300'
+                                      : item.paymentType === 'WHEEL_SPIN_FEE'
+                                      ? 'bg-purple-500/20 border border-purple-500/40 text-purple-300'
+                                      : 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-300'
+                                  }`}>
+                                    {item.paymentType === 'PRO_MEMBERSHIP' && '👑 PRO VIP Membership'}
+                                    {item.paymentType === 'WHEEL_SPIN_FEE' && '🎡 Wheel Spin Fee'}
+                                    {item.paymentType === 'REDEMPTION_FEE' && '💸 Cash Payout Verification'}
+                                  </span>
+                                </div>
+
+                                <div className="text-[11px] text-slate-400 flex items-center gap-3 flex-wrap">
+                                  <span>Amount Paid: <strong className="text-emerald-400 font-mono font-bold">₹{item.amountINR} INR</strong></span>
+                                  <span>•</span>
+                                  <span>Time: {new Date(item.timestamp).toLocaleString()}</span>
+                                  <span>•</span>
+                                  <span className="font-mono text-slate-500 text-[10px]">User ID: {item.userId}</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Center/Right: UTR Box & Status Badge */}
+                            <div className="flex items-center gap-3 w-full lg:w-auto justify-between lg:justify-end">
+                              <div className="bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2 flex items-center gap-3">
+                                <div>
+                                  <div className="text-[9px] uppercase font-bold text-slate-500">12-Digit PhonePe / UPI UTR</div>
+                                  <div className="text-xs font-mono font-bold text-amber-400 tracking-wider">{item.utrNumber}</div>
+                                </div>
+                                <button
+                                  onClick={() => handleCopyText(item.utrNumber, item.id)}
+                                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition"
+                                  title="Copy UTR Reference"
+                                >
+                                  {isCopyingThis ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-slate-400" />}
+                                </button>
+                              </div>
+
+                              {/* Status Badge */}
+                              <span className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 shrink-0 ${
+                                item.status === 'pending'
+                                  ? 'bg-amber-500/20 border border-amber-500/50 text-amber-300 animate-pulse'
+                                  : item.status === 'approved'
+                                  ? 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-300'
+                                  : 'bg-rose-500/20 border border-rose-500/30 text-rose-300'
+                              }`}>
+                                {item.status === 'pending' && <Clock className="w-3.5 h-3.5 text-amber-400" />}
+                                {item.status === 'approved' && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />}
+                                {item.status === 'declined' && <XCircle className="w-3.5 h-3.5 text-rose-400" />}
+                                <span>{item.status}</span>
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Quick Admin Actions if rawReq exists */}
+                          {item.rawReq && item.status === 'pending' && (
+                            <div className="pt-2 border-t border-slate-900 flex items-center justify-end gap-2">
+                              <button
+                                onClick={() => handleDeclineProRequest(item.rawReq!)}
+                                className="px-3.5 py-1.5 rounded-xl bg-rose-500/20 border border-rose-500/40 hover:bg-rose-500/30 text-rose-300 text-xs font-bold transition flex items-center gap-1.5"
+                              >
+                                <XCircle className="w-3.5 h-3.5" />
+                                <span>Decline Request</span>
+                              </button>
+
+                              <button
+                                onClick={() => handleApproveProRequest(item.rawReq!)}
+                                className="px-4 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black transition flex items-center gap-1.5 shadow-md shadow-emerald-500/20"
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                <span>Approve & Verify Scanner Payment</span>
+                              </button>
+                            </div>
+                          )}
+
+                          {item.declineReason && (
+                            <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-[11px] font-medium">
+                              Decline Reason: {item.declineReason}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      )}
 
       {/* TAB 0: UTR CHECKS & PRO MEMBERSHIP APPROVALS */}
       {activeAdminTab === 'utr_approvals' && (
@@ -709,83 +1060,56 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         </div>
       )}
 
-      {/* TAB 1: UPLOAD PHONEPE QR SCANNER */}
+      {/* TAB 1: PAYMENT LINK & GATEWAY CONFIGURATION */}
       {activeAdminTab === 'qr_upload' && (
-        <div className="p-6 rounded-3xl bg-slate-900 border border-purple-500/30 space-y-6 shadow-xl">
+        <div className="p-6 rounded-3xl bg-slate-900 border border-emerald-500/30 space-y-6 shadow-xl">
           <div className="flex items-center justify-between border-b border-slate-800 pb-4">
             <div>
               <h2 className="text-lg font-black text-white flex items-center gap-2">
-                <QrCode className="w-5 h-5 text-purple-400" />
-                PhonePe & UPI Merchant QR Code Manager
+                <Zap className="w-5 h-5 text-emerald-400" />
+                Direct Payment Link & Merchant Gateway Config
               </h2>
               <p className="text-xs text-slate-400 mt-0.5">
-                Upload your custom PhonePe QR scanner image and update merchant details for Wheel Spin & Cash Redemptions.
+                Manage custom checkout payment links (Spotify Premium style) and set pricing for Wheel Spins, Redemptions, and PRO VIP passes.
               </p>
             </div>
             <button
               onClick={handleResetQRConfig}
               className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold flex items-center gap-1.5 transition"
             >
-              <RefreshCw className="w-3.5 h-3.5 text-purple-400" /> Reset Default
+              <RefreshCw className="w-3.5 h-3.5 text-emerald-400" /> Reset Default
             </button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
             
-            {/* Left Column: Upload Controls & Inputs */}
+            {/* Left Column: Direct Payment Link & Merchant Controls */}
             <div className="space-y-4">
               
-              {/* Image Upload Box */}
-              <div className="space-y-2">
-                <label className="block text-xs font-bold text-slate-300">
-                  Upload Custom PhonePe QR Code Image <span className="text-purple-400">(PNG / JPG / DataURL)</span>
-                </label>
-                <div className="relative border-2 border-dashed border-purple-500/40 rounded-2xl p-4 bg-slate-950/60 hover:border-purple-400 transition text-center cursor-pointer group">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleFileUpload}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                  />
-                  <div className="space-y-2 pointer-events-none">
-                    <div className="w-10 h-10 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center mx-auto group-hover:scale-110 transition">
-                      <Upload className="w-5 h-5" />
-                    </div>
-                    <div className="text-xs font-bold text-purple-300">
-                      Click or Drag & Drop QR Image File
-                    </div>
-                    <div className="text-[10px] text-slate-500">
-                      Supports high-resolution PNG, JPG, or WEBP up to 5MB
-                    </div>
-                  </div>
-                </div>
-
-                {uploadError && (
-                  <p className="text-xs text-rose-400 font-medium flex items-center gap-1">
-                    <AlertCircle className="w-3.5 h-3.5" /> {uploadError}
-                  </p>
-                )}
-              </div>
-
-              {/* Direct Image URL fallback */}
+              {/* Direct Checkout Payment Link Input */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-300">Or Paste Custom Image URL</label>
+                <label className="block text-xs font-bold text-slate-300">
+                  Custom Direct Checkout Payment Link <span className="text-emerald-400">(Razorpay / PhonePe / Gateway URL)</span>
+                </label>
                 <div className="relative">
                   <input
-                    type="text"
-                    placeholder="https://example.com/my-phonepe-qr.png"
-                    value={qrConfig.qrImageUrl || ''}
-                    onChange={(e) => setQrConfig(prev => ({ ...prev, qrImageUrl: e.target.value }))}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-cyan-300 font-mono focus:outline-none focus:border-purple-500"
+                    type="url"
+                    placeholder="e.g. https://pay.mindforge.app/checkout or upi://pay?pa=..."
+                    value={qrConfig.paymentLink || ''}
+                    onChange={(e) => setQrConfig(prev => ({ ...prev, paymentLink: e.target.value }))}
+                    className="w-full bg-slate-950 border border-emerald-500/40 rounded-xl px-4 py-2.5 text-xs text-emerald-300 font-mono focus:outline-none focus:border-emerald-400"
                   />
-                  <ImageIcon className="w-4 h-4 text-slate-500 absolute right-3 top-3" />
+                  <Zap className="w-4 h-4 text-emerald-400 absolute right-3 top-3" />
                 </div>
+                <p className="text-[10px] text-slate-400">
+                  If set, clicking "Pay via Checkout Link" in user modals will redirect to this URL directly.
+                </p>
               </div>
 
               {/* Merchant Details Inputs */}
               <div className="grid grid-cols-2 gap-3 pt-2">
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-300">Merchant UPI ID (Hidden)</label>
+                  <label className="text-xs font-bold text-slate-300">Merchant UPI Reference (Hidden)</label>
                   <input
                     type="password"
                     value={qrConfig.upiId}
@@ -851,44 +1175,39 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
             </div>
 
-            {/* Right Column: Live Scanner Preview */}
-            <div className="p-5 rounded-3xl bg-slate-950 border border-slate-800 space-y-4 text-center">
-              <div className="text-xs font-bold text-purple-300 uppercase tracking-wider flex items-center justify-center gap-1.5">
-                <QrCode className="w-4 h-4 text-amber-400" /> Active Scanner Preview (User View)
+            {/* Right Column: Live Spotify Premium Style Checkout Card Preview */}
+            <div className="p-5 rounded-3xl bg-slate-950 border border-emerald-500/30 space-y-4 text-center">
+              <div className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center justify-center gap-1.5">
+                <Crown className="w-4 h-4 text-amber-400" /> Spotify-Style Direct Checkout Link Preview
               </div>
 
-              <div className="inline-block p-4 rounded-3xl bg-white border-4 border-[#5f259f] shadow-2xl relative">
-                {qrConfig.qrImageUrl ? (
-                  <img
-                    src={qrConfig.qrImageUrl}
-                    alt="Custom Uploaded PhonePe QR"
-                    className="w-52 h-52 mx-auto object-contain rounded-lg"
-                  />
-                ) : (
-                  <div className="w-52 h-52 flex flex-col items-center justify-center bg-slate-100 rounded-lg text-slate-700 text-xs font-mono gap-2 p-2">
-                    <QrCode className="w-16 h-16 text-[#5f259f]" />
-                    <span className="font-bold">Auto Generated UPI QR</span>
-                    <span className="text-[10px] text-emerald-600 font-bold truncate max-w-full">Official NPCI Scanner QR</span>
-                  </div>
-                )}
-              </div>
-
-              <div className="space-y-1 text-xs">
-                <div className="text-white font-bold">{qrConfig.merchantName}</div>
-                <div className="text-emerald-400 font-mono text-[11px]">Official Merchant Scanner Verified</div>
+              <div className="p-5 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-900 to-emerald-950/60 border border-emerald-500/30 text-left space-y-3 shadow-xl">
+                <div className="flex items-center justify-between">
+                  <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-black uppercase tracking-wider">PRO VIP Pass</span>
+                  <span className="text-xs font-mono font-bold text-emerald-400">₹{qrConfig.premiumFeeINR || 99}.00 / mo</span>
+                </div>
+                <div className="text-sm font-black text-white">{qrConfig.merchantName}</div>
+                <button
+                  type="button"
+                  className="w-full py-2.5 rounded-xl bg-emerald-500 text-slate-950 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md"
+                >
+                  <Zap className="w-4 h-4 fill-slate-950" />
+                  <span>Pay via Checkout Link</span>
+                </button>
+                <div className="text-[10px] text-slate-400 text-center">No scanner image or UPI ID required</div>
               </div>
 
               {qrSaveMsg && (
                 <div className="p-2.5 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center justify-center gap-1.5 animate-bounce">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400" /> Custom QR Code Saved & Deployed to App!
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400" /> Direct Checkout Link Config Saved & Live!
                 </div>
               )}
 
               <button
                 onClick={handleSaveQRConfig}
-                className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-black text-xs uppercase tracking-wider hover:brightness-110 transition shadow-lg shadow-purple-500/25 flex items-center justify-center gap-2"
+                className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-500 text-slate-950 font-black text-xs uppercase tracking-wider hover:brightness-110 transition shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2"
               >
-                <Save className="w-4 h-4" /> Save & Deploy QR Scanner Config
+                <Save className="w-4 h-4" /> Save & Deploy Payment Link Config
               </button>
             </div>
 

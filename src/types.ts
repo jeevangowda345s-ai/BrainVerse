@@ -76,6 +76,7 @@ export interface UserProfile {
 export interface QRMerchantConfig {
   upiId: string;
   merchantName: string;
+  paymentLink?: string;
   qrImageUrl?: string;
   wheelSpinFeeINR: number;
   redemptionFeeINR: number;
@@ -97,6 +98,7 @@ export interface ProUpgradeRequest {
   status: 'pending' | 'approved' | 'declined';
   timestamp: string;
   declineReason?: string;
+  paymentType?: 'PRO_MEMBERSHIP' | 'WHEEL_SPIN_FEE' | 'REDEMPTION_FEE';
 }
 
 export interface RedemptionRecord {

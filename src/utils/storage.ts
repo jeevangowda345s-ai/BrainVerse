@@ -20,6 +20,7 @@ const QR_CONFIG_KEY = 'mindforge_qr_config_v2';
 export const DEFAULT_QR_CONFIG: QRMerchantConfig = {
   upiId: 'jeevanms@ybl',
   merchantName: 'MindForge Technologies India Ltd (Jeevan M S)',
+  paymentLink: '',
   qrImageUrl: '',
   wheelSpinFeeINR: 9,
   redemptionFeeINR: 10,

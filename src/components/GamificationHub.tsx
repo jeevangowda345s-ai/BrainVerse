@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Gift, Award, Flame, Sparkles, CheckCircle2, RotateCw, Trophy, Zap, Coins, X, ShieldCheck, Lock, Copy, Check, QrCode, AlertCircle, Loader2, Smartphone, ExternalLink, Eye, EyeOff } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import QRCode from 'qrcode';
-import { UserProfile, DailyMission, Achievement } from '../types';
+import { UserProfile, DailyMission, Achievement, ProUpgradeRequest } from '../types';
 import { audioHaptics } from '../utils/audioHaptics';
-import { loadQRMerchantConfig, maskUpiId } from '../utils/storage';
+import { loadQRMerchantConfig, saveProUpgradeRequest, maskUpiId } from '../utils/storage';
+import { submitProUpgradeRequestToFirestore } from '../services/firebaseService';
 
 export interface WheelReward {
   label: string;
@@ -118,6 +119,21 @@ export const GamificationHub: React.FC<GamificationHubProps> = ({
     setPaymentError(null);
     setVerifyingPayment(true);
     audioHaptics.playClick();
+
+    // Log Scanner Payment Record for Admin Scanner Payers List
+    const spinReq: ProUpgradeRequest = {
+      id: 'spin_pay_' + Date.now(),
+      userId: user.id || 'guest',
+      userName: user.name || 'Anonymous User',
+      userEmail: user.email || 'user@brainverse.app',
+      utrNumber: cleanUtr,
+      amountINR: SPIN_FEE_INR,
+      status: 'approved',
+      timestamp: new Date().toISOString(),
+      paymentType: 'WHEEL_SPIN_FEE'
+    };
+    saveProUpgradeRequest(spinReq);
+    submitProUpgradeRequestToFirestore(spinReq).catch(e => console.warn(e));
 
     // Secure SSL PhonePe Payment Verification Handshake
     setTimeout(() => {
@@ -455,36 +471,35 @@ export const GamificationHub: React.FC<GamificationHubProps> = ({
                 </div>
               </div>
 
-              {/* QR Code Container */}
-              <div className="text-center space-y-3">
-                <div className="inline-block p-4 rounded-3xl bg-white border-4 border-[#5f259f] shadow-2xl relative">
-                  {spinQrDataUrl ? (
-                    <img
-                      src={spinQrDataUrl}
-                      alt="UPI Scanner QR"
-                      className="w-52 h-52 mx-auto object-contain rounded-lg"
-                    />
-                  ) : (
-                    <div className="w-52 h-52 flex items-center justify-center text-slate-500 font-mono text-xs">
-                      Generating QR...
-                    </div>
-                  )}
-                </div>
-                <div className="text-[11px] text-purple-300 font-medium flex items-center justify-center gap-1.5">
-                  <QrCode className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Scan QR using any UPI App</span>
+              {/* Spotify Style Checkout Link Card */}
+              <div className="p-5 rounded-2xl bg-gradient-to-br from-slate-950 via-slate-900 to-purple-950/60 border border-purple-500/30 text-center space-y-4 shadow-xl">
+                <div className="space-y-1">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-black uppercase tracking-widest">
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Direct Payment Checkout Link</span>
+                  </div>
+                  <h4 className="text-base font-black text-white">Daily Lucky Wheel Spin Pass</h4>
+                  <div className="text-2xl font-black text-amber-400 font-mono">
+                    ₹{SPIN_FEE_INR}.00 <span className="text-xs text-slate-400 font-sans font-normal">INR</span>
+                  </div>
                 </div>
 
-                {/* Pay App button */}
-                <div className="flex items-center justify-center">
-                  <a
-                    href={UPI_PAY_URL}
-                    className="px-5 py-2 rounded-xl bg-purple-500/20 border border-purple-500/40 text-purple-300 hover:bg-purple-500/30 text-xs font-bold transition flex items-center gap-2 shadow-sm"
-                  >
-                    <Zap className="w-3.5 h-3.5 text-amber-300" />
-                    <span>Pay via Any UPI App</span>
-                  </a>
-                </div>
+                {/* Direct Checkout Button */}
+                <a
+                  href={qrConfig.paymentLink || UPI_PAY_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => audioHaptics.playClick()}
+                  className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-500 hover:from-purple-500 hover:to-indigo-500 text-white font-black text-xs uppercase tracking-wider transition shadow-lg shadow-purple-500/20 flex items-center justify-center gap-2 group"
+                >
+                  <Zap className="w-4 h-4 text-amber-300 fill-amber-300" />
+                  <span>Pay via Direct Checkout Link</span>
+                  <ExternalLink className="w-3.5 h-3.5 text-purple-200 group-hover:translate-x-0.5 transition-transform" />
+                </a>
+
+                <p className="text-[10px] text-slate-400">
+                  Clicking opens direct secure checkout to pay ₹{SPIN_FEE_INR} to {MERCHANT_NAME}.
+                </p>
               </div>
 
               {/* UTR Reference Verification Input */}
