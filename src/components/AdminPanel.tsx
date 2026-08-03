@@ -129,6 +129,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
     await updateProUpgradeRequestInFirestore(req.id, req.userId, 'approved');
 
+    // Grant PRO Membership in Firestore for the user
+    if (req.userId) {
+      await adminUpdateUserProfileInFirestore(req.userId, { isPremium: true }).catch(e => console.warn(e));
+    }
+
+    // Update registered users list
+    setAllRegisteredUsers(prev =>
+      prev.map(u => (u.id === req.userId || u.email === req.userEmail) ? { ...u, isPremium: true } : u)
+    );
+
     // If current user is target user, upgrade active session as well
     if (req.userId === user.id || user.email === req.userEmail) {
       const updatedUser = { ...user, isPremium: true };
@@ -137,7 +147,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       setEditingIsPremium(true);
     }
 
-    setProActionMsg(`APPROVED! User "${req.userName}" is now a VIP PRO Member.`);
+    setProActionMsg(`APPROVED! User "${req.userName}" payment verified. PRO VIP Membership activated.`);
     setTimeout(() => setProActionMsg(null), 3500);
     loadAllProRequests();
   };
@@ -184,15 +194,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [editingIsAdmin, setEditingIsAdmin] = useState<boolean>(Boolean(selectedUser.isAdmin));
   const [userSaveMsg, setUserSaveMsg] = useState<string | null>(null);
 
-  // Subscribe to ALL users in real time & purge non-admin PRO VIP status
+  // Subscribe to ALL users in real time
   useEffect(() => {
     let unsub: (() => void) | null = null;
     if (isAdminUnlocked) {
       unsub = subscribeToAllUsers((userList) => {
         setAllRegisteredUsers(userList);
       });
-      // Automatically enforce PRO VIP removal for non-admins in Firestore
-      revokeAllNonAdminProUsersFromFirestore().catch(e => console.warn(e));
     }
     return () => {
       if (unsub) unsub();
@@ -214,7 +222,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         setEditingLevel(target.level ?? 1);
         setEditingStreak(target.streak ?? 1);
         setEditingXp(target.xp ?? 0);
-        setEditingIsPremium(isTargetMaster); // STRICT: Only master admin can be PRO VIP
+        setEditingIsPremium(Boolean(target.isPremium)); // Reflects paid/subscribed status
         setEditingIsAdmin(isTargetMaster); // STRICT: Only master admin can be Admin
       }
     }
@@ -232,7 +240,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       setEditingLevel(target.level ?? 1);
       setEditingStreak(target.streak ?? 1);
       setEditingXp(target.xp ?? 0);
-      setEditingIsPremium(isTargetMaster);
+      setEditingIsPremium(Boolean(target.isPremium));
       setEditingIsAdmin(isTargetMaster);
       setUserSaveMsg(`Reloaded latest stats for "${target.name || 'User'}"`);
       setTimeout(() => setUserSaveMsg(null), 2500);
@@ -329,7 +337,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       level: Math.max(1, Number(editingLevel) || 1),
       streak: Math.max(0, Number(editingStreak) || 0),
       xp: Math.max(0, Number(editingXp) || 0),
-      isPremium: isTargetMaster, // STRICT: Only jeevangowda345s@gmail.com is PRO VIP
+      isPremium: Boolean(editingIsPremium), // Reflects paid/subscribed status granted or toggled
       isAdmin: isTargetMaster, // STRICT: Only jeevangowda345s@gmail.com is Admin
     };
 
@@ -368,7 +376,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     const revokedCount = await revokeAllNonAdminProUsersFromFirestore();
     audioHaptics.playFanfare();
     audioHaptics.triggerHaptic('success');
-    setUserSaveMsg(`Single Admin Policy Enforced: Removed Admin & PRO VIP privileges from non-master accounts. Only Master Admin (${MASTER_ADMIN_EMAIL}) is Admin.`);
+    setUserSaveMsg(`Single Admin Policy Enforced: Removed unauthorized Admin privileges from non-master accounts. Only Master Admin (${MASTER_ADMIN_EMAIL}) is Admin.`);
     setTimeout(() => setUserSaveMsg(null), 4500);
   };
 
@@ -1407,15 +1415,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => {
-                    const isMaster = Boolean(selectedUser.email && selectedUser.email.toLowerCase().trim() === MASTER_ADMIN_EMAIL.toLowerCase());
-                    if (!isMaster) {
-                      alert(`PRO VIP membership is strictly restricted to Master Admin (${MASTER_ADMIN_EMAIL}). All non-admin PRO access is disabled.`);
-                      setEditingIsPremium(false);
-                      return;
-                    }
-                    setEditingIsPremium(!editingIsPremium);
-                  }}
+                  onClick={() => setEditingIsPremium(!editingIsPremium)}
                   className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
                     editingIsPremium 
                       ? 'bg-amber-500 text-slate-950 font-black shadow-lg shadow-amber-500/20' 
@@ -1423,7 +1423,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   }`}
                 >
                   <Crown className="w-3.5 h-3.5" />
-                  {editingIsPremium ? 'PRO VIP MEMBER' : 'PRO (ADMIN ONLY)'}
+                  {editingIsPremium ? 'PRO VIP MEMBER (Active)' : 'Grant PRO VIP (Paid/Subscribed)'}
                 </button>
 
                 <button
