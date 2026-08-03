@@ -47,35 +47,14 @@ export const PremiumMembershipModal: React.FC<PremiumMembershipModalProps> = ({
   const [utrNumber, setUtrNumber] = useState('');
   const [utrError, setUtrError] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
-  const [qrDataUrl, setQrDataUrl] = useState<string>('');
+  const [isSubmittedPending, setIsSubmittedPending] = useState(false);
+  const [submittedUtr, setSubmittedUtr] = useState<string>('');
 
   const qrConfig = loadQRMerchantConfig();
   const merchantUpi = qrConfig.upiId || 'jeevanms@ybl';
   const merchantName = qrConfig.merchantName || 'Jeevan M S';
   const MEMBERSHIP_FEE_INR = qrConfig.premiumFeeINR || 99;
   const upiPayString = `upi://pay?pa=${merchantUpi}&pn=${encodeURIComponent(merchantName)}&am=${MEMBERSHIP_FEE_INR}.00&cu=INR&tn=${encodeURIComponent(`BrainVerse PRO Membership ${MEMBERSHIP_FEE_INR} INR`)}`;
-
-  // Generate QR Code
-  useEffect(() => {
-    if (isOpen) {
-      if (qrConfig.qrImageUrl) {
-        setQrDataUrl(qrConfig.qrImageUrl);
-      } else {
-        QRCode.toDataURL(upiPayString, {
-          width: 320,
-          margin: 2,
-          color: {
-            dark: '#000000',
-            light: '#ffffff',
-          },
-          errorCorrectionLevel: 'H',
-        })
-          .then((url) => setQrDataUrl(url))
-          .catch((err) => console.error('PRO QR Error:', err));
-      }
-    }
-  }, [isOpen, upiPayString, qrConfig.qrImageUrl]);
 
   if (!isOpen) return null;
 
@@ -93,59 +72,15 @@ export const PremiumMembershipModal: React.FC<PremiumMembershipModalProps> = ({
     setTimeout(() => setCopiedAmount(false), 2000);
   };
 
-  const handleActivatePremium = (utr?: string) => {
-    // PLAY SUCCESSFUL PAYMENT AUDIO CHIME
-    audioHaptics.playPaymentSuccess();
-    audioHaptics.playFanfare();
-    confetti({
-      particleCount: 120,
-      spread: 100,
-      origin: { y: 0.5 },
-    });
-
-    const updatedUser: UserProfile = {
-      ...user,
-      isPremium: true,
-      lastWheelSpinDate: '', // Reset wheel spin so user gets instant free spin
-    };
-
-    onUpdateUser(updatedUser);
-    saveUserProfile(updatedUser);
-    if (updatedUser.id) {
-      saveUserProfileToFirestore(updatedUser).catch(e => console.warn(e));
-    }
-
-    // Submit UTR Upgrade Record for Admin Panel Verification Rights
-    const reqId = 'pro_req_' + Date.now();
-    const proReq: ProUpgradeRequest = {
-      id: reqId,
-      userId: user.id || 'guest',
-      userName: user.name || 'MindForge Scholar',
-      userEmail: user.email || 'user@brainverse.app',
-      utrNumber: utr ? utr.trim() : (utrNumber.trim() || 'DIRECT_VIP_PAY'),
-      amountINR: MEMBERSHIP_FEE_INR,
-      status: 'pending',
-      timestamp: new Date().toISOString(),
-      paymentType: 'PRO_MEMBERSHIP',
-    };
-    saveProUpgradeRequest(proReq);
-    submitProUpgradeRequestToFirestore(proReq).catch(e => console.warn(e));
-
-    setIsSuccess(true);
-    setTimeout(() => {
-      setIsSuccess(false);
-      onClose();
-    }, 2500);
-  };
-
-  const handleVerifyUTR = () => {
-    if (!utrNumber.trim()) {
-      setUtrError('Please enter the 12-digit PhonePe / UPI Transaction Ref (UTR) number.');
+  const handleSubmitUTRForAdminApproval = () => {
+    const cleanUtr = utrNumber.trim();
+    if (!cleanUtr) {
+      setUtrError('Please enter the 12-digit PhonePe / Gateway Transaction Ref (UTR) number.');
       audioHaptics.triggerHaptic('error');
       return;
     }
 
-    if (utrNumber.trim().length < 8) {
+    if (cleanUtr.length < 8) {
       setUtrError('Please enter a valid 12-digit UTR reference number.');
       audioHaptics.triggerHaptic('error');
       return;
@@ -157,7 +92,27 @@ export const PremiumMembershipModal: React.FC<PremiumMembershipModalProps> = ({
 
     setTimeout(() => {
       setIsVerifying(false);
-      handleActivatePremium(utrNumber.trim());
+      
+      // Submit UTR Upgrade Record to Admin Panel with 'pending' status
+      const reqId = 'pro_req_' + Date.now();
+      const proReq: ProUpgradeRequest = {
+        id: reqId,
+        userId: user.id || 'guest',
+        userName: user.name || 'MindForge Scholar',
+        userEmail: user.email || 'user@brainverse.app',
+        utrNumber: cleanUtr,
+        amountINR: MEMBERSHIP_FEE_INR,
+        status: 'pending',
+        timestamp: new Date().toISOString(),
+        paymentType: 'PRO_MEMBERSHIP',
+      };
+      saveProUpgradeRequest(proReq);
+      submitProUpgradeRequestToFirestore(proReq).catch(e => console.warn(e));
+
+      setSubmittedUtr(cleanUtr);
+      setIsSubmittedPending(true);
+      audioHaptics.playCorrect();
+      audioHaptics.triggerHaptic('success');
     }, 1200);
   };
 
@@ -339,61 +294,77 @@ export const PremiumMembershipModal: React.FC<PremiumMembershipModalProps> = ({
           </div>
 
           {/* UTR Reference Input & Verification */}
-          <div className="space-y-3 pt-2">
-            <label className="block text-xs font-bold text-slate-300">
-              Step 2: Enter 12-Digit Transaction Reference (UTR) from Checkout Link Payment
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                placeholder="e.g. 420918739182"
-                value={utrNumber}
-                onChange={(e) => setUtrNumber(e.target.value)}
-                className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-amber-300 font-mono font-bold focus:outline-none focus:border-amber-400"
-              />
-              <button
-                onClick={handleVerifyUTR}
-                disabled={isVerifying}
-                className="px-5 py-2.5 rounded-xl bg-emerald-500 text-slate-950 font-black text-xs uppercase hover:bg-emerald-400 transition flex items-center gap-1.5 shrink-0"
-              >
-                {isVerifying ? (
-                  <>
-                    <RotateCw className="w-4 h-4 animate-spin" /> Verifying...
-                  </>
-                ) : (
-                  <>
-                    <ShieldCheck className="w-4 h-4" /> Verify Payment
-                  </>
-                )}
-              </button>
+          {user.isPremium ? (
+            <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-bold text-center flex items-center justify-center gap-2">
+              <Crown className="w-5 h-5 text-amber-400" />
+              <span>VIP PRO Account Active (5X Multiplier Granted)</span>
             </div>
-
-            {utrError && (
-              <p className="text-xs text-rose-400 font-medium">{utrError}</p>
-            )}
-
-            {/* Direct Instant Upgrade Button */}
-            <div className="pt-2">
-              <button
-                onClick={handleActivatePremium}
-                className="w-full py-4 rounded-2xl bg-gradient-to-r from-amber-400 via-orange-500 to-yellow-400 text-slate-950 font-black text-sm uppercase tracking-wider hover:brightness-110 transition shadow-xl shadow-amber-500/20 flex items-center justify-center gap-2"
-              >
-                <Crown className="w-5 h-5 text-slate-950" />
-                <span>Instant Pay & Activate PRO (₹{MEMBERSHIP_FEE_INR} INR)</span>
-                <ArrowRight className="w-5 h-5" />
-              </button>
+          ) : isSubmittedPending ? (
+            <div className="p-5 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-900 to-emerald-950/60 border border-emerald-500/40 text-center space-y-3 shadow-xl animate-fade-in">
+              <div className="w-12 h-12 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 flex items-center justify-center mx-auto">
+                <CheckCircle2 className="w-6 h-6" />
+              </div>
+              <div className="space-y-1">
+                <div className="text-xs font-black uppercase tracking-widest text-emerald-400">
+                  UTR Reference Submitted to Admin
+                </div>
+                <h4 className="text-base font-black text-white">Payment Verification Pending</h4>
+                <div className="text-xs font-mono text-amber-300 font-bold">
+                  UTR Reference: {submittedUtr}
+                </div>
+              </div>
+              <p className="text-xs text-slate-300 leading-relaxed max-w-md mx-auto">
+                Your payment UTR of <span className="text-emerald-400 font-bold">₹{MEMBERSHIP_FEE_INR} INR</span> has been logged and sent to Master Admin (<span className="text-amber-300 font-mono font-bold">jeevangowda345s@gmail.com</span>).
+              </p>
+              <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 text-[11px] text-slate-400 font-medium leading-normal">
+                🛡️ <strong className="text-slate-200">Payment Succeeded Guarantee:</strong> Your VIP PRO membership (5X Multiplier) will be activated immediately as soon as the Admin accepts your UTR payment in the Admin Console.
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="space-y-3 pt-2">
+              <label className="block text-xs font-bold text-slate-300">
+                Step 2: Enter 12-Digit Transaction Reference (UTR) from Payment
+              </label>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <input
+                  type="text"
+                  maxLength={12}
+                  placeholder="e.g. 420918739182"
+                  value={utrNumber}
+                  onChange={(e) => setUtrNumber(e.target.value.replace(/\D/g, ''))}
+                  className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-xs text-amber-300 font-mono font-bold focus:outline-none focus:border-emerald-400 tracking-wider"
+                />
+                <button
+                  type="button"
+                  onClick={handleSubmitUTRForAdminApproval}
+                  disabled={isVerifying || utrNumber.length < 8}
+                  className="px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-400 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs uppercase tracking-wider transition disabled:opacity-50 flex items-center justify-center gap-2 shrink-0 shadow-lg shadow-emerald-500/20"
+                >
+                  {isVerifying ? (
+                    <>
+                      <RotateCw className="w-4 h-4 animate-spin text-slate-950" />
+                      <span>Sending to Admin...</span>
+                    </>
+                  ) : (
+                    <>
+                      <ShieldCheck className="w-4 h-4 text-slate-950 fill-slate-950" />
+                      <span>Submit UTR for Admin Verification</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {utrError && (
+                <p className="text-xs text-rose-400 font-medium">{utrError}</p>
+              )}
+
+              <p className="text-[10px] text-slate-400 text-center font-medium">
+                🔒 Requests are verified strictly by Master Admin (<span className="text-amber-300 font-mono font-bold">jeevangowda345s@gmail.com</span>) in the UTR Verification panel before granting PRO VIP.
+              </p>
+            </div>
+          )}
 
         </div>
-
-        {/* Feedback Success State */}
-        {isSuccess && (
-          <div className="p-4 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-bold text-center flex items-center justify-center gap-2 animate-bounce">
-            <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-            <span>Welcome to VIP PRO! 5X Multiplier is now active on all earnings!</span>
-          </div>
-        )}
 
       </div>
     </div>
