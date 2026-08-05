@@ -22,6 +22,7 @@ import { LevelUpModal } from './components/LevelUpModal';
 import { RedeemCashModal } from './components/RedeemCashModal';
 import { PremiumMembershipModal } from './components/PremiumMembershipModal';
 import { AvatarModal } from './components/AvatarModal';
+import { DeclinedPaymentModal } from './components/DeclinedPaymentModal';
 import { getRankForLevel } from './utils/ranks';
 
 // Mini Games
@@ -42,7 +43,8 @@ import {
   Achievement,
   GameSessionResult,
   GameId,
-  RedemptionRecord
+  RedemptionRecord,
+  ProUpgradeRequest
 } from './types';
 
 import {
@@ -56,6 +58,9 @@ import {
   saveAchievements,
   loadGameSessions,
   saveGameSession,
+  loadProUpgradeRequests,
+  loadDismissedDeclinedReqIds,
+  dismissDeclinedReqId,
   DEFAULT_USER
 } from './utils/storage';
 
@@ -72,7 +77,8 @@ import {
   saveUserProfileToFirestore, 
   logGameSessionToFirestore, 
   addCoinsInFirestore,
-  addWheelRewardsInFirestore
+  addWheelRewardsInFirestore,
+  fetchProUpgradeRequestsFromFirestore
 } from './services/firebaseService';
 
 export default function App() {
@@ -95,6 +101,54 @@ export default function App() {
   const [showAvatarModal, setShowAvatarModal] = useState<boolean>(false);
   const [unlockedToastAchievement, setUnlockedToastAchievement] = useState<Achievement | null>(null);
   const [levelUpModalState, setLevelUpModalState] = useState<{ isOpen: boolean; oldLevel: number; newLevel: number } | null>(null);
+  const [declinedRequestToShow, setDeclinedRequestToShow] = useState<ProUpgradeRequest | null>(null);
+
+  // Poll for declined payment requests to display "Invalid UTR / Payment Declined" popup
+  useEffect(() => {
+    let isMounted = true;
+
+    const checkDeclinedRequests = async () => {
+      if (!user.id && !user.email) return;
+      const local = loadProUpgradeRequests();
+      let remote: ProUpgradeRequest[] = [];
+      try {
+        remote = await fetchProUpgradeRequestsFromFirestore();
+      } catch (e) {}
+
+      const map = new Map<string, ProUpgradeRequest>();
+      remote.forEach(r => map.set(r.id, r));
+      local.forEach(r => {
+        if (!map.has(r.id)) map.set(r.id, r);
+      });
+
+      const dismissedIds = loadDismissedDeclinedReqIds();
+      const declined = Array.from(map.values()).find(
+        r => (r.userId === user.id || r.userEmail === user.email) &&
+             r.status === 'declined' &&
+             !dismissedIds.includes(r.id)
+      );
+
+      if (declined && isMounted) {
+        setDeclinedRequestToShow(declined);
+        audioHaptics.triggerHaptic('error');
+      }
+    };
+
+    checkDeclinedRequests();
+    const interval = setInterval(checkDeclinedRequests, 3500);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [user.id, user.email]);
+
+  const handleCloseDeclinedModal = () => {
+    if (declinedRequestToShow) {
+      dismissDeclinedReqId(declinedRequestToShow.id);
+    }
+    setDeclinedRequestToShow(null);
+  };
 
   // Cash Redemption Handler
   const handleRedeemSuccess = (record: RedemptionRecord, coinsDeducted: number) => {
@@ -675,6 +729,14 @@ export default function App() {
         user={user}
         onUpdateUser={handleUpdateUser}
       />
+
+      {/* Invalid UTR / Payment Declined Pop-up Modal */}
+      {declinedRequestToShow && (
+        <DeclinedPaymentModal
+          request={declinedRequestToShow}
+          onClose={handleCloseDeclinedModal}
+        />
+      )}
 
     </div>
   );

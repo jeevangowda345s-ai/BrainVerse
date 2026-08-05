@@ -578,6 +578,24 @@ export function saveProUpgradeRequest(req: ProUpgradeRequest): void {
   localStorage.setItem(PRO_REQUESTS_KEY, JSON.stringify(list));
 }
 
+const DISMISSED_DECLINED_KEY = 'brainverse_dismissed_declined_req_ids';
+
+export function loadDismissedDeclinedReqIds(): string[] {
+  if (typeof window === 'undefined') return [];
+  const saved = localStorage.getItem(DISMISSED_DECLINED_KEY);
+  if (!saved) return [];
+  try { return JSON.parse(saved); } catch (e) { return []; }
+}
+
+export function dismissDeclinedReqId(id: string): void {
+  if (typeof window === 'undefined') return;
+  const list = loadDismissedDeclinedReqIds();
+  if (!list.includes(id)) {
+    list.push(id);
+    localStorage.setItem(DISMISSED_DECLINED_KEY, JSON.stringify(list));
+  }
+}
+
 export function maskUpiId(upi: string): string {
   return upi || '';
 }
