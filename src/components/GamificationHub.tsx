@@ -5,7 +5,7 @@ import QRCode from 'qrcode';
 import { UserProfile, DailyMission, Achievement, ProUpgradeRequest } from '../types';
 import { audioHaptics } from '../utils/audioHaptics';
 import { loadQRMerchantConfig, loadProUpgradeRequests, saveProUpgradeRequest, maskUpiId } from '../utils/storage';
-import { submitProUpgradeRequestToFirestore, fetchProUpgradeRequestsFromFirestore } from '../services/firebaseService';
+import { submitProUpgradeRequestToFirestore, fetchProUpgradeRequestsFromFirestore, updateProUpgradeRequestInFirestore } from '../services/firebaseService';
 
 export interface WheelReward {
   label: string;
@@ -200,10 +200,11 @@ export const GamificationHub: React.FC<GamificationHubProps> = ({
       audioHaptics.triggerHaptic('levelUp');
       confetti({ particleCount: 60, spread: 80 });
 
-      // Mark approved request as claimed locally
+      // Mark approved request as claimed locally & in Firestore (1 spin pass per payment)
       if (approvedSpinReq) {
         const consumedReq: ProUpgradeRequest = { ...approvedSpinReq, status: 'declined', declineReason: 'Claimed spin reward' };
         saveProUpgradeRequest(consumedReq);
+        updateProUpgradeRequestInFirestore(approvedSpinReq.id, user.id || 'guest', 'declined', 'Claimed spin reward').catch(e => console.warn(e));
       }
 
       if (onClaimWheelReward) {
@@ -324,7 +325,7 @@ export const GamificationHub: React.FC<GamificationHubProps> = ({
             <div className="p-3.5 rounded-2xl bg-amber-950/60 border border-amber-500/50 text-left space-y-1 animate-fade-in">
               <div className="text-xs font-black text-amber-300 flex items-center gap-2">
                 <Clock className="w-4 h-4 text-amber-400 animate-pulse shrink-0" />
-                <span>Wheel Spin Payment Pending Admin Acceptance</span>
+                <span>Payment Processing (Waiting for Admin Verification)</span>
               </div>
               <div className="text-[11px] text-slate-300 leading-relaxed">
                 UTR Ref: <span className="font-mono text-amber-300 font-bold">{pendingSpinReq.utrNumber}</span>. Master Admin (<strong className="text-amber-300">jeevangowda345s@gmail.com</strong>) must click Accept in UTR Verification panel before your spin unlocks.
@@ -332,14 +333,26 @@ export const GamificationHub: React.FC<GamificationHubProps> = ({
             </div>
           )}
 
-          {approvedSpinReq && !hasSpunToday && (
+          {approvedSpinReq && (
             <div className="p-3.5 rounded-2xl bg-emerald-950/70 border border-emerald-500/50 text-left space-y-1 animate-fade-in">
               <div className="text-xs font-black text-emerald-300 flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
                 <span>Admin Approved Your ₹{SPIN_FEE_INR} Payment!</span>
               </div>
               <div className="text-[11px] text-emerald-200/90 leading-relaxed">
-                Master Admin (<strong className="text-emerald-300">jeevangowda345s@gmail.com</strong>) accepted your payment UTR. Click below to spin the wheel now!
+                Master Admin (<strong className="text-emerald-300">jeevangowda345s@gmail.com</strong>) accepted your payment UTR. Click below to spin the wheel now! (1 Spin Pass Unlocked)
+              </div>
+            </div>
+          )}
+
+          {!pendingSpinReq && !approvedSpinReq && (
+            <div className="p-3.5 rounded-2xl bg-purple-950/40 border border-purple-500/30 text-left space-y-1">
+              <div className="text-xs font-black text-purple-300 flex items-center gap-2">
+                <QrCode className="w-4 h-4 text-amber-400 shrink-0" />
+                <span>Payment Required for Lucky Wheel Spin</span>
+              </div>
+              <div className="text-[11px] text-slate-300 leading-relaxed">
+                Pay ₹{SPIN_FEE_INR} via PhonePe & enter UTR to send request to Master Admin (<strong className="text-amber-300">jeevangowda345s@gmail.com</strong>).
               </div>
             </div>
           )}
@@ -348,12 +361,12 @@ export const GamificationHub: React.FC<GamificationHubProps> = ({
             <button
               type="button"
               disabled
-              className="w-full py-3.5 rounded-2xl bg-slate-800 text-slate-400 font-bold text-xs uppercase cursor-not-allowed flex items-center justify-center gap-2 border border-slate-700"
+              className="w-full py-3.5 rounded-2xl bg-slate-800 text-amber-300 font-bold text-xs uppercase cursor-not-allowed flex items-center justify-center gap-2 border border-amber-500/40 shadow-inner"
             >
               <Clock className="w-4 h-4 animate-spin text-amber-400" />
-              <span>Waiting for Admin UTR Approval...</span>
+              <span>Payment Processing (Waiting for Admin Verification...)</span>
             </button>
-          ) : (approvedSpinReq && !hasSpunToday) ? (
+          ) : approvedSpinReq ? (
             <button
               type="button"
               onClick={executeWheelSpin}
@@ -361,26 +374,7 @@ export const GamificationHub: React.FC<GamificationHubProps> = ({
               className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-400 text-slate-950 font-black text-xs uppercase tracking-wider hover:brightness-110 transition active:scale-95 disabled:opacity-50 shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2"
             >
               <RotateCw className={`w-4 h-4 ${spinning ? 'animate-spin' : ''}`} />
-              <span>{spinning ? 'Spinning Wheel...' : 'Spin Lucky Wheel Now!'}</span>
-            </button>
-          ) : isFreeSpinForUser && !hasSpunToday ? (
-            <button
-              type="button"
-              onClick={executeWheelSpin}
-              disabled={spinning}
-              className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-black text-xs uppercase tracking-wider hover:brightness-110 transition active:scale-95 disabled:opacity-50 shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2"
-            >
-              <Sparkles className="w-4 h-4 text-slate-950" />
-              <span>{spinning ? 'Spinning...' : 'Free Daily PRO Wheel Spin'}</span>
-            </button>
-          ) : hasSpunToday ? (
-            <button
-              type="button"
-              disabled
-              className="w-full py-3.5 rounded-2xl bg-slate-800 text-slate-500 font-bold text-xs uppercase cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-              <span>Daily Spin Claimed for Today</span>
+              <span>{spinning ? 'Spinning Wheel...' : 'Spin Lucky Wheel Now! (1 Pass Available)'}</span>
             </button>
           ) : (
             <button
@@ -390,12 +384,12 @@ export const GamificationHub: React.FC<GamificationHubProps> = ({
               className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-purple-600 via-pink-600 to-amber-500 text-white font-black text-xs uppercase tracking-wider hover:brightness-110 transition active:scale-95 disabled:opacity-50 shadow-lg shadow-purple-500/25 flex items-center justify-center gap-2"
             >
               <QrCode className="w-4 h-4 text-amber-300 animate-pulse" />
-              <span>Pay ₹{SPIN_FEE_INR} via PhonePe & Submit UTR</span>
+              <span>Pay ₹{SPIN_FEE_INR} via PhonePe & Submit UTR to Spin</span>
             </button>
           )}
 
           <p className="text-[10px] text-slate-400 font-medium">
-            Scan PhonePe QR Code & pay <strong>₹9.00 INR</strong> to authorize spin. Spin the wheel to win exciting coins and brain score rewards!
+            Scan PhonePe QR Code & pay <strong>₹{SPIN_FEE_INR}.00 INR</strong> to authorize spin. Requires verification & acceptance by Master Admin (<strong>jeevangowda345s@gmail.com</strong>).
           </p>
         </div>
 
