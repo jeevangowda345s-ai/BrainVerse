@@ -221,7 +221,9 @@ export default function App() {
                 prev.isAdmin === targetIsAdmin &&
                 prev.name === firestoreProfile.name &&
                 prev.email === nextEmail &&
-                prev.lastWheelSpinDate === firestoreProfile.lastWheelSpinDate;
+                prev.lastWheelSpinDate === firestoreProfile.lastWheelSpinDate &&
+                prev.lastDailyBonusClaimAt === firestoreProfile.lastDailyBonusClaimAt &&
+                prev.freeSpinPasses === firestoreProfile.freeSpinPasses;
 
               if (isIdentical) return prev;
 
@@ -613,6 +615,7 @@ export default function App() {
             achievements={achievements}
             onClaimMission={handleClaimMission}
             onUpdateCoins={handleUpdateCoins}
+            onUpdateUser={handleUpdateUser}
             onClaimWheelReward={handleClaimWheelReward}
             onTestTriggerToast={(ach) => setUnlockedToastAchievement(ach)}
             onTestLevelUp={() => triggerLevelUp(user.level || 1, (user.level || 1) + 1)}

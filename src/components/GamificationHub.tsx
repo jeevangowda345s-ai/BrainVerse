@@ -5,7 +5,7 @@ import QRCode from 'qrcode';
 import { UserProfile, DailyMission, Achievement, ProUpgradeRequest } from '../types';
 import { audioHaptics } from '../utils/audioHaptics';
 import { loadQRMerchantConfig, loadProUpgradeRequests, saveProUpgradeRequest, maskUpiId } from '../utils/storage';
-import { submitProUpgradeRequestToFirestore, fetchProUpgradeRequestsFromFirestore, updateProUpgradeRequestInFirestore } from '../services/firebaseService';
+import { submitProUpgradeRequestToFirestore, fetchProUpgradeRequestsFromFirestore, updateProUpgradeRequestInFirestore, addWheelRewardsInFirestore } from '../services/firebaseService';
 
 export interface WheelReward {
   label: string;
@@ -33,6 +33,7 @@ interface GamificationHubProps {
   achievements: Achievement[];
   onClaimMission: (id: string) => void;
   onUpdateCoins: (amount: number) => void;
+  onUpdateUser?: (updated: UserProfile) => void;
   onClaimWheelReward?: (rewards: { coins?: number; brainScore?: number; diamonds?: number; xp?: number; spinDate?: string }) => void;
   onTestTriggerToast?: (achievement: Achievement) => void;
   onTestLevelUp?: () => void;
@@ -45,6 +46,7 @@ export const GamificationHub: React.FC<GamificationHubProps> = ({
   achievements,
   onClaimMission,
   onUpdateCoins,
+  onUpdateUser,
   onClaimWheelReward,
   onTestTriggerToast,
   onTestLevelUp,
@@ -64,6 +66,59 @@ export const GamificationHub: React.FC<GamificationHubProps> = ({
 
   // UTR Request tracking for wheel spin
   const [spinRequests, setSpinRequests] = useState<ProUpgradeRequest[]>([]);
+
+  // Live Timer State for Daily Bonus (24-Hour Countdown)
+  const [nowMs, setNowMs] = useState<number>(Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setNowMs(Date.now());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const lastClaimMs = user.lastDailyBonusClaimAt ? new Date(user.lastDailyBonusClaimAt).getTime() : 0;
+  const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
+  const timeElapsedMs = nowMs - lastClaimMs;
+  const isDailyBonusAvailable = !user.lastDailyBonusClaimAt || timeElapsedMs >= TWENTY_FOUR_HOURS_MS;
+  const timeRemainingMs = isDailyBonusAvailable ? 0 : Math.max(0, TWENTY_FOUR_HOURS_MS - timeElapsedMs);
+
+  const formatTimer = (ms: number) => {
+    const totalSec = Math.floor(ms / 1000);
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    return `${h.toString().padStart(2, '0')}h : ${m.toString().padStart(2, '0')}m : ${s.toString().padStart(2, '0')}s`;
+  };
+
+  const handleClaimDailyBonus = () => {
+    if (!isDailyBonusAvailable) return;
+
+    audioHaptics.playFanfare();
+    audioHaptics.triggerHaptic('levelUp');
+    confetti({ particleCount: 90, spread: 100 });
+
+    const newCoins = (user.coins || 0) + 50;
+    const newBrainScore = (user.brainScore || 0) + 100;
+    const currentPasses = user.freeSpinPasses ?? 1;
+    const newPasses = currentPasses + 1;
+    const nowIso = new Date().toISOString();
+
+    if (onUpdateUser) {
+      onUpdateUser({
+        ...user,
+        coins: newCoins,
+        brainScore: newBrainScore,
+        freeSpinPasses: newPasses,
+        lastDailyBonusClaimAt: nowIso,
+      });
+    }
+
+    addWheelRewardsInFirestore(user.id || 'guest', {
+      coins: 50,
+      brainScore: 100,
+    }).catch(e => console.warn(e));
+  };
 
   const loadUserSpinRequests = async () => {
     const local = loadProUpgradeRequests();
@@ -213,6 +268,16 @@ export const GamificationHub: React.FC<GamificationHubProps> = ({
         const consumedReq: ProUpgradeRequest = { ...approvedSpinReq, status: 'declined', declineReason: 'Claimed spin reward' };
         saveProUpgradeRequest(consumedReq);
         updateProUpgradeRequestInFirestore(approvedSpinReq.id, user.id || 'guest', 'declined', 'Claimed spin reward').catch(e => console.warn(e));
+      } else if (!isMasterAdmin) {
+        // Consume 1 free spin pass
+        const currentPasses = user.freeSpinPasses ?? 1;
+        const newPasses = Math.max(0, currentPasses - 1);
+        if (onUpdateUser) {
+          onUpdateUser({
+            ...user,
+            freeSpinPasses: newPasses,
+          });
+        }
       }
 
       if (onClaimWheelReward) {
@@ -290,6 +355,72 @@ export const GamificationHub: React.FC<GamificationHubProps> = ({
           </button>
         </div>
       )}
+
+      {/* Daily Claim Bonus Banner (1 Free Spin, 50 Coins, 100 Brain Score) */}
+      <div className="p-6 rounded-3xl bg-gradient-to-r from-purple-950/90 via-slate-900 to-amber-950/90 border border-amber-500/40 shadow-2xl space-y-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="p-2.5 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/40">
+                <Gift className="w-6 h-6 animate-bounce" />
+              </span>
+              <div>
+                <h2 className="text-lg font-black text-white uppercase tracking-tight flex items-center gap-2">
+                  Daily 24-Hour Reward Claim & Free Spin
+                </h2>
+                <p className="text-xs text-slate-300">
+                  Claim your free daily package every 24 hours to stay on top of the leaderboard!
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="px-3 py-1.5 rounded-xl bg-amber-500/20 border border-amber-400/40 text-amber-300 font-extrabold text-xs flex items-center gap-1.5 shadow-sm">
+              <Coins className="w-4 h-4 text-amber-400" /> +50 Coins
+            </span>
+            <span className="px-3 py-1.5 rounded-xl bg-cyan-500/20 border border-cyan-400/40 text-cyan-300 font-extrabold text-xs flex items-center gap-1.5 shadow-sm">
+              🧠 +100 Brain Score
+            </span>
+            <span className="px-3 py-1.5 rounded-xl bg-purple-500/20 border border-purple-400/40 text-purple-300 font-extrabold text-xs flex items-center gap-1.5 shadow-sm">
+              🎡 +1 Free Spin Pass
+            </span>
+          </div>
+        </div>
+
+        <div className="pt-3 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-xs font-bold">
+            <Clock className={`w-4 h-4 ${isDailyBonusAvailable ? 'text-emerald-400' : 'text-amber-400 animate-pulse'}`} />
+            <span className="text-slate-300">
+              {isDailyBonusAvailable ? (
+                <span className="text-emerald-400 font-black">Daily Reward Ready To Claim!</span>
+              ) : (
+                <>Next Claim Available In: <span className="font-mono text-amber-300 font-black text-sm">{formatTimer(timeRemainingMs)}</span></>
+              )}
+            </span>
+          </div>
+
+          {isDailyBonusAvailable ? (
+            <button
+              type="button"
+              onClick={handleClaimDailyBonus}
+              className="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 text-slate-950 font-black text-xs uppercase tracking-wider hover:brightness-110 active:scale-95 transition shadow-lg shadow-amber-500/25 flex items-center justify-center gap-2"
+            >
+              <Sparkles className="w-4 h-4 text-slate-950 fill-slate-950" />
+              <span>CLAIM DAILY BONUS (+50 Coins, +100 Brain, +1 Free Spin)</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled
+              className="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-slate-800/90 text-slate-400 font-bold text-xs uppercase cursor-not-allowed flex items-center justify-center gap-2 border border-slate-700"
+            >
+              <Lock className="w-4 h-4 text-slate-500" />
+              <span>Claimed • Timer Active ({formatTimer(timeRemainingMs)})</span>
+            </button>
+          )}
+        </div>
+      </div>
 
       {/* Lucky Wheel & Mystery Box */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -437,43 +568,84 @@ export const GamificationHub: React.FC<GamificationHubProps> = ({
             </>
           ) : (
             <>
-              {pendingSpinReq && (
-                <div className="p-3.5 rounded-2xl bg-amber-950/60 border border-amber-500/50 text-left space-y-1 animate-fade-in">
-                  <div className="text-xs font-black text-amber-300 flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-amber-400 animate-pulse shrink-0" />
-                    <span>Payment Processing (Waiting for Admin Verification)</span>
-                  </div>
-                  <div className="text-[11px] text-slate-300 leading-relaxed">
-                    UTR Ref: <span className="font-mono text-amber-300 font-bold">{pendingSpinReq.utrNumber}</span>. Master Admin (<strong className="text-amber-300">jeevangowda345s@gmail.com</strong>) must click Accept in UTR Verification panel before your spin unlocks.
-                  </div>
-                </div>
-              )}
-
-              {approvedSpinReq && (
+              {approvedSpinReq ? (
                 <div className="p-3.5 rounded-2xl bg-emerald-950/70 border border-emerald-500/50 text-left space-y-1 animate-fade-in">
                   <div className="text-xs font-black text-emerald-300 flex items-center gap-2">
                     <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
                     <span>Admin Approved Your ₹{SPIN_FEE_INR} Payment!</span>
                   </div>
                   <div className="text-[11px] text-emerald-200/90 leading-relaxed">
-                    Master Admin (<strong className="text-emerald-300">jeevangowda345s@gmail.com</strong>) accepted your payment UTR. Click below to spin the wheel now! (1 Spin Pass Unlocked)
+                    Master Admin (<strong className="text-emerald-300">jeevangowda345s@gmail.com</strong>) accepted your payment UTR. Click below to spin the wheel now!
                   </div>
                 </div>
-              )}
-
-              {!pendingSpinReq && !approvedSpinReq && (
+              ) : (user.freeSpinPasses ?? 1) > 0 ? (
+                <div className="p-3.5 rounded-2xl bg-cyan-950/60 border border-cyan-500/40 text-left space-y-1 animate-fade-in">
+                  <div className="text-xs font-black text-cyan-300 flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-cyan-400 shrink-0 animate-pulse" />
+                    <span>Daily Free Spin Pass Available!</span>
+                  </div>
+                  <div className="text-[11px] text-slate-300 leading-relaxed">
+                    You have <strong className="text-cyan-300">{user.freeSpinPasses ?? 1} Free Spin Pass(es)</strong>. Spin now to win up to +200 Coins & Brain Score!
+                  </div>
+                </div>
+              ) : pendingSpinReq ? (
+                <div className="p-3.5 rounded-2xl bg-amber-950/60 border border-amber-500/50 text-left space-y-1 animate-fade-in">
+                  <div className="text-xs font-black text-amber-300 flex items-center justify-between gap-2">
+                    <span className="flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-amber-400 animate-pulse shrink-0" />
+                      <span>Payment Processing (Waiting for Admin Verification)</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (pendingSpinReq) {
+                          updateProUpgradeRequestInFirestore(pendingSpinReq.id, user.id || 'guest', 'declined', 'Cancelled by user').catch(e => console.warn(e));
+                          loadUserSpinRequests();
+                        }
+                      }}
+                      className="text-[10px] font-bold text-rose-400 hover:text-rose-300 underline"
+                    >
+                      Clear Request
+                    </button>
+                  </div>
+                  <div className="text-[11px] text-slate-300 leading-relaxed">
+                    UTR Ref: <span className="font-mono text-amber-300 font-bold">{pendingSpinReq.utrNumber}</span>. Master Admin (<strong className="text-amber-300">jeevangowda345s@gmail.com</strong>) must click Accept in UTR Verification panel before your spin unlocks.
+                  </div>
+                </div>
+              ) : (
                 <div className="p-3.5 rounded-2xl bg-purple-950/40 border border-purple-500/30 text-left space-y-1">
                   <div className="text-xs font-black text-purple-300 flex items-center gap-2">
                     <QrCode className="w-4 h-4 text-amber-400 shrink-0" />
-                    <span>Payment Required for Lucky Wheel Spin</span>
+                    <span>0 Free Passes Left — Payment Required to Spin More</span>
                   </div>
                   <div className="text-[11px] text-slate-300 leading-relaxed">
-                    Pay ₹{SPIN_FEE_INR} via PhonePe & enter UTR to send request to Master Admin (<strong className="text-amber-300">jeevangowda345s@gmail.com</strong>).
+                    You have used your daily free spin pass. Pay ₹{SPIN_FEE_INR} via PhonePe QR scanner & enter UTR to send request to Master Admin (<strong className="text-amber-300">jeevangowda345s@gmail.com</strong>) for additional spins.
                   </div>
                 </div>
               )}
 
-              {pendingSpinReq ? (
+              {approvedSpinReq ? (
+                <button
+                  type="button"
+                  onClick={executeWheelSpin}
+                  disabled={spinning}
+                  className="w-full py-4 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-400 text-slate-950 font-black text-xs uppercase tracking-wider hover:brightness-110 transition active:scale-95 disabled:opacity-50 shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2"
+                >
+                  <RotateCw className={`w-4 h-4 ${spinning ? 'animate-spin' : ''}`} />
+                  <span>{spinning ? 'Spider-Man Turning Wheel...' : 'Spin Lucky Wheel Now! (1 Paid Pass Unlocked)'}</span>
+                </button>
+              ) : (user.freeSpinPasses ?? 1) > 0 ? (
+                <button
+                  type="button"
+                  onClick={executeWheelSpin}
+                  disabled={spinning}
+                  className="w-full py-4 rounded-2xl bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 text-white font-black text-xs uppercase tracking-wider hover:brightness-110 transition active:scale-95 disabled:opacity-50 shadow-lg shadow-cyan-500/25 flex items-center justify-center gap-2"
+                >
+                  <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" />
+                  <RotateCw className={`w-4 h-4 ${spinning ? 'animate-spin' : ''}`} />
+                  <span>{spinning ? 'Spider-Man Turning Wheel...' : `Spin Lucky Wheel Free (${user.freeSpinPasses ?? 1} Pass Available)`}</span>
+                </button>
+              ) : pendingSpinReq ? (
                 <button
                   type="button"
                   disabled
@@ -481,16 +653,6 @@ export const GamificationHub: React.FC<GamificationHubProps> = ({
                 >
                   <Clock className="w-4 h-4 animate-spin text-amber-400" />
                   <span>Payment Processing (Waiting for Admin Verification...)</span>
-                </button>
-              ) : approvedSpinReq ? (
-                <button
-                  type="button"
-                  onClick={executeWheelSpin}
-                  disabled={spinning}
-                  className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-400 text-slate-950 font-black text-xs uppercase tracking-wider hover:brightness-110 transition active:scale-95 disabled:opacity-50 shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2"
-                >
-                  <RotateCw className={`w-4 h-4 ${spinning ? 'animate-spin' : ''}`} />
-                  <span>{spinning ? 'Spinning Wheel...' : 'Spin Lucky Wheel Now! (1 Pass Available)'}</span>
                 </button>
               ) : (
                 <button
@@ -500,12 +662,16 @@ export const GamificationHub: React.FC<GamificationHubProps> = ({
                   className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-purple-600 via-pink-600 to-amber-500 text-white font-black text-xs uppercase tracking-wider hover:brightness-110 transition active:scale-95 disabled:opacity-50 shadow-lg shadow-purple-500/25 flex items-center justify-center gap-2"
                 >
                   <QrCode className="w-4 h-4 text-amber-300 animate-pulse" />
-                  <span>Pay ₹{SPIN_FEE_INR} via PhonePe & Submit UTR to Spin</span>
+                  <span>Pay ₹{SPIN_FEE_INR} via PhonePe Scanner & Submit UTR to Spin</span>
                 </button>
               )}
 
               <p className="text-[10px] text-slate-400 font-medium">
-                Scan PhonePe QR Code & pay <strong>₹{SPIN_FEE_INR}.00 INR</strong> to authorize spin. Requires verification & acceptance by Master Admin (<strong>jeevangowda345s@gmail.com</strong>).
+                {(user.freeSpinPasses ?? 1) > 0 ? (
+                  <>Claimed 1 free spin pass today. Want to spin more? Pay ₹{SPIN_FEE_INR} via PhonePe QR scanner!</>
+                ) : (
+                  <>Scan PhonePe QR Code & pay <strong>₹{SPIN_FEE_INR}.00 INR</strong> to authorize extra spin. Requires verification & acceptance by Master Admin (<strong>jeevangowda345s@gmail.com</strong>).</>
+                )}
               </p>
             </>
           )}

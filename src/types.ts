@@ -66,6 +66,8 @@ export interface UserProfile {
   isReturningUser?: boolean;
   isGuest?: boolean;
   lastWheelSpinDate?: string;
+  lastDailyBonusClaimAt?: string;
+  freeSpinPasses?: number;
   createdAt?: string;
   lastActiveAt?: string;
   updatedAt?: string;

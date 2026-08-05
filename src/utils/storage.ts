@@ -264,6 +264,7 @@ export const DEFAULT_USER: UserProfile = {
   unlockedCosmetics: [],
   isPremium: false,
   isOnboarded: true,
+  freeSpinPasses: 1,
 };
 
 export const DEFAULT_MISSIONS: DailyMission[] = [
