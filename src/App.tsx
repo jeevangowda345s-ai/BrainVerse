@@ -126,6 +126,8 @@ export default function App() {
       const declined = Array.from(map.values()).find(
         r => (r.userId === user.id || r.userEmail === user.email) &&
              r.status === 'declined' &&
+             r.declineReason !== 'Claimed spin reward' &&
+             r.declineReason !== 'Cancelled by user' &&
              !dismissedIds.includes(r.id)
       );
 

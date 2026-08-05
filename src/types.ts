@@ -97,7 +97,7 @@ export interface ProUpgradeRequest {
   userEmail: string;
   utrNumber: string;
   amountINR: number;
-  status: 'pending' | 'approved' | 'declined';
+  status: 'pending' | 'approved' | 'declined' | 'completed' | 'cancelled';
   timestamp: string;
   declineReason?: string;
   paymentType?: 'PRO_MEMBERSHIP' | 'WHEEL_SPIN_FEE' | 'REDEMPTION_FEE';

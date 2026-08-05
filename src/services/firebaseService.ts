@@ -477,7 +477,7 @@ export async function fetchProUpgradeRequestsFromFirestore(): Promise<ProUpgrade
 export async function updateProUpgradeRequestInFirestore(
   requestId: string,
   userId: string,
-  status: 'approved' | 'declined',
+  status: 'approved' | 'declined' | 'completed' | 'cancelled',
   declineReason?: string
 ): Promise<void> {
   try {

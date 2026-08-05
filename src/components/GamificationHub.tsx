@@ -100,8 +100,7 @@ export const GamificationHub: React.FC<GamificationHubProps> = ({
 
     const newCoins = (user.coins || 0) + 50;
     const newBrainScore = (user.brainScore || 0) + 100;
-    const currentPasses = user.freeSpinPasses ?? 1;
-    const newPasses = currentPasses + 1;
+    const newPasses = 1;
     const nowIso = new Date().toISOString();
 
     if (onUpdateUser) {
@@ -265,9 +264,9 @@ export const GamificationHub: React.FC<GamificationHubProps> = ({
 
       // Mark approved request as claimed locally & in Firestore (1 spin pass per payment)
       if (approvedSpinReq) {
-        const consumedReq: ProUpgradeRequest = { ...approvedSpinReq, status: 'declined', declineReason: 'Claimed spin reward' };
+        const consumedReq: ProUpgradeRequest = { ...approvedSpinReq, status: 'completed', declineReason: 'Claimed spin reward' };
         saveProUpgradeRequest(consumedReq);
-        updateProUpgradeRequestInFirestore(approvedSpinReq.id, user.id || 'guest', 'declined', 'Claimed spin reward').catch(e => console.warn(e));
+        updateProUpgradeRequestInFirestore(approvedSpinReq.id, user.id || 'guest', 'completed', 'Claimed spin reward').catch(e => console.warn(e));
       } else if (!isMasterAdmin) {
         // Consume 1 free spin pass
         const currentPasses = user.freeSpinPasses ?? 1;
@@ -599,7 +598,9 @@ export const GamificationHub: React.FC<GamificationHubProps> = ({
                       type="button"
                       onClick={() => {
                         if (pendingSpinReq) {
-                          updateProUpgradeRequestInFirestore(pendingSpinReq.id, user.id || 'guest', 'declined', 'Cancelled by user').catch(e => console.warn(e));
+                          const cancelledReq: ProUpgradeRequest = { ...pendingSpinReq, status: 'cancelled', declineReason: 'Cancelled by user' };
+                          saveProUpgradeRequest(cancelledReq);
+                          updateProUpgradeRequestInFirestore(pendingSpinReq.id, user.id || 'guest', 'cancelled', 'Cancelled by user').catch(e => console.warn(e));
                           loadUserSpinRequests();
                         }
                       }}
