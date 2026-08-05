@@ -59,6 +59,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 }) => {
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Brain },
+    { id: 'profile', label: 'Profile & Status', icon: User, badge: 'Live' },
     { id: 'games', label: '15 Mini-Games', icon: Gamepad2 },
     { id: 'coach', label: 'AI Coach Jeevu', icon: Bot, badge: 'AI' },
     { id: 'analytics', label: 'Analytics', icon: BarChart3 },
@@ -388,14 +389,10 @@ export const Navbar: React.FC<NavbarProps> = ({
             <div 
               onClick={() => {
                 audioHaptics.playClick();
-                if (onOpenAvatarModal) {
-                  onOpenAvatarModal();
-                } else {
-                  handleTabChange('dashboard');
-                }
+                handleTabChange('profile');
               }}
               className="flex items-center gap-1 pl-0.5 cursor-pointer group shrink-0"
-              title="Click to change or capture profile avatar photo"
+              title="Click to view Profile & Transaction Status"
             >
               <div className="w-8 h-8 rounded-xl bg-[#00F5FF]/20 p-0.5 border border-[#00F5FF]/40 group-hover:border-[#00F5FF] transition shadow-[0_0_10px_rgba(0,245,255,0.2)] overflow-hidden">
                 <div className="w-full h-full rounded-[9px] bg-[#050505] flex items-center justify-center text-sm font-bold overflow-hidden">

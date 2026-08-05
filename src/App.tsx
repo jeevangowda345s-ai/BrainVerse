@@ -23,6 +23,7 @@ import { RedeemCashModal } from './components/RedeemCashModal';
 import { PremiumMembershipModal } from './components/PremiumMembershipModal';
 import { AvatarModal } from './components/AvatarModal';
 import { DeclinedPaymentModal } from './components/DeclinedPaymentModal';
+import { UserProfileView } from './components/UserProfileView';
 import { getRankForLevel } from './utils/ranks';
 
 // Mini Games
@@ -205,8 +206,8 @@ export default function App() {
               const isMasterAdmin = Boolean(nextEmail && nextEmail.toLowerCase().trim() === 'jeevangowda345s@gmail.com');
               
               const targetIsAdmin = isMasterAdmin; // STRICT: Only jeevangowda345s@gmail.com gets Admin rights
-              // STRICT: isPremium is granted ONLY when a user pays or takes a subscription
-              const targetIsPremium = Boolean(firestoreProfile.isPremium);
+              // Master Admin gets lifetime PRO VIP 5X perks completely FREE
+              const targetIsPremium = isMasterAdmin || Boolean(firestoreProfile.isPremium);
 
               const isIdentical =
                 prev.id === firebaseUser.uid &&
@@ -263,7 +264,7 @@ export default function App() {
     const isMasterAdmin = Boolean(updatedUser.email && updatedUser.email.toLowerCase().trim() === 'jeevangowda345s@gmail.com');
     const enforcedUser = {
       ...updatedUser,
-      isPremium: Boolean(updatedUser.isPremium), // STRICT: Require payment/subscription for PRO
+      isPremium: isMasterAdmin ? true : Boolean(updatedUser.isPremium), // Master Admin gets FREE PRO VIP
       isAdmin: isMasterAdmin, // STRICT: Only admin jeevangowda345s@gmail.com is Admin
     };
     setUser(enforcedUser);
@@ -576,6 +577,16 @@ export default function App() {
             onUpdateUser={handleUpdateUser}
             onOpenPremium={() => setShowPremiumModal(true)}
             onOpenAvatarModal={() => setShowAvatarModal(true)}
+          />
+        )}
+
+        {activeTab === 'profile' && (
+          <UserProfileView
+            user={user}
+            onUpdateUser={handleUpdateUser}
+            onOpenAvatarModal={() => setShowAvatarModal(true)}
+            onOpenPremium={() => setShowPremiumModal(true)}
+            onOpenRedeemCash={() => setShowRedeemCashModal(true)}
           />
         )}
 

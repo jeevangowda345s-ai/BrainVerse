@@ -23,7 +23,8 @@ import {
   RefreshCw,
   Zap,
   Eye,
-  EyeOff
+  EyeOff,
+  Crown
 } from 'lucide-react';
 import { UserProfile, RedemptionRecord } from '../types';
 import { audioHaptics } from '../utils/audioHaptics';
@@ -44,9 +45,10 @@ export const RedeemCashModal: React.FC<RedeemCashModalProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'redeem' | 'history'>('redeem');
   
+  const isMasterAdmin = Boolean(user.isAdmin || (user.email && user.email.toLowerCase().trim() === 'jeevangowda345s@gmail.com'));
   // Rate: 1,000,000 coins = 1 INR
   const COINS_PER_INR = 1000000;
-  const REQUIRED_FEE_INR = 10;
+  const REQUIRED_FEE_INR = isMasterAdmin ? 0 : 10;
 
   // Form states
   const [coinsToRedeem, setCoinsToRedeem] = useState<number>(1000000);
@@ -76,7 +78,7 @@ export const RedeemCashModal: React.FC<RedeemCashModalProps> = ({
   const qrConfig = loadQRMerchantConfig();
   const merchantUpi = qrConfig.upiId || 'jeevanms@ybl';
   const merchantName = qrConfig.merchantName || 'Jeevan M S';
-  const redemptionFeeINR = qrConfig.redemptionFeeINR || 10;
+  const redemptionFeeINR = isMasterAdmin ? 0 : (qrConfig.redemptionFeeINR || 10);
   const upiPayString = `upi://pay?pa=${merchantUpi}&pn=${encodeURIComponent(merchantName)}&am=${redemptionFeeINR}.00&cu=INR&tn=${encodeURIComponent('MindForge Redemption Fee')}`;
 
   // Calculate equivalent INR
@@ -139,7 +141,7 @@ export const RedeemCashModal: React.FC<RedeemCashModalProps> = ({
       return;
     }
 
-    if (user.coins < coinsToRedeem) {
+    if (!isMasterAdmin && user.coins < coinsToRedeem) {
       setErrorMsg(`Insufficient coin balance! You need ${coinsToRedeem.toLocaleString()} coins (You have ${user.coins.toLocaleString()}).`);
       return;
     }
@@ -159,7 +161,9 @@ export const RedeemCashModal: React.FC<RedeemCashModalProps> = ({
       return;
     }
 
-    if (!utrNumber.trim() || utrNumber.trim().length < 6) {
+    const effectiveUtr = isMasterAdmin ? (utrNumber.trim() || 'MASTER-ADMIN-FREE-BYPASS') : utrNumber.trim();
+
+    if (!isMasterAdmin && (!effectiveUtr || effectiveUtr.length < 6)) {
       setErrorMsg('Please enter a valid 12-digit UTR or UPI Transaction Reference Number from your ₹10 payment.');
       return;
     }
@@ -194,7 +198,7 @@ export const RedeemCashModal: React.FC<RedeemCashModalProps> = ({
       paymentMethod,
       payoutDestination: destinationText,
       feePaidAmount: REQUIRED_FEE_INR,
-      utrNumber: utrNumber.trim(),
+      utrNumber: effectiveUtr,
       screenshotUrl: screenshotPreview || undefined,
       status: 'PROCESSING_PAYOUT',
       timestamp: new Date().toLocaleDateString('en-IN', {
@@ -205,7 +209,7 @@ export const RedeemCashModal: React.FC<RedeemCashModalProps> = ({
         minute: '2-digit'
       }),
       estimatedDelivery: '2 to 24 Hours (Direct UPI / Bank Batch)',
-      notes: '₹10 Verification Fee verified successfully with Jeevan M S PhonePe merchant gateway.'
+      notes: isMasterAdmin ? 'Master Admin Free Bypass (Fee Waived for jeevangowda345s@gmail.com).' : '₹10 Verification Fee verified successfully with Jeevan M S PhonePe merchant gateway.'
     };
 
     setIsVerifying(false);
@@ -677,7 +681,7 @@ export const RedeemCashModal: React.FC<RedeemCashModalProps> = ({
             <button
               type="submit"
               disabled={isVerifying}
-              className="w-full py-4 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 text-slate-950 font-black text-sm uppercase tracking-wider shadow-lg shadow-emerald-500/25 hover:brightness-110 active:scale-98 transition flex items-center justify-center gap-2 disabled:opacity-50"
+              className="w-full py-4 rounded-2xl bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 text-slate-950 font-black text-sm uppercase tracking-wider shadow-lg shadow-amber-500/25 hover:brightness-110 active:scale-98 transition flex items-center justify-center gap-2 disabled:opacity-50"
             >
               {isVerifying ? (
                 <>
@@ -686,16 +690,16 @@ export const RedeemCashModal: React.FC<RedeemCashModalProps> = ({
                 </>
               ) : (
                 <>
-                  <IndianRupee className="w-5 h-5 text-slate-950" />
-                  <span>VERIFY ₹10 FEE & CLAIM ₹{calculatedINR.toFixed(2)} CASH</span>
+                  <Crown className="w-5 h-5 text-slate-950 fill-slate-950" />
+                  <span>{isMasterAdmin ? `CLAIM ₹${calculatedINR.toFixed(2)} CASH (100% FREE MASTER ADMIN PASS)` : `VERIFY ₹10 FEE & CLAIM ₹${calculatedINR.toFixed(2)} CASH`}</span>
                   <ArrowRight className="w-5 h-5 text-slate-950" />
                 </>
               )}
             </button>
 
-            <p className="text-[11px] text-slate-500 text-center flex items-center justify-center gap-1">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Payments processed via Jeevan M S PhonePe Verified Gateway • 100% Guaranteed</span>
+            <p className="text-[11px] text-amber-300/90 text-center flex items-center justify-center gap-1 font-medium">
+              <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+              <span>{isMasterAdmin ? 'Master Admin Account: All Redemption & Gateway Fees Are 100% Waived' : 'Payments processed via Jeevan M S PhonePe Verified Gateway • 100% Guaranteed'}</span>
             </p>
 
           </form>

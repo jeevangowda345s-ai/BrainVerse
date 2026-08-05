@@ -63,10 +63,11 @@ export const PremiumMembershipModal: React.FC<PremiumMembershipModalProps> = ({
     }
   }, [isOpen, user.id, user.email]);
 
+  const isMasterAdmin = Boolean(user.isAdmin || (user.email && user.email.toLowerCase().trim() === 'jeevangowda345s@gmail.com'));
   const qrConfig = loadQRMerchantConfig();
   const merchantUpi = qrConfig.upiId || 'jeevanms@ybl';
   const merchantName = qrConfig.merchantName || 'Jeevan M S';
-  const MEMBERSHIP_FEE_INR = qrConfig.premiumFeeINR || 99;
+  const MEMBERSHIP_FEE_INR = isMasterAdmin ? 0 : (qrConfig.premiumFeeINR || 99);
   const upiPayString = `upi://pay?pa=${merchantUpi}&pn=${encodeURIComponent(merchantName)}&am=${MEMBERSHIP_FEE_INR}.00&cu=INR&tn=${encodeURIComponent(`BrainVerse PRO Membership ${MEMBERSHIP_FEE_INR} INR`)}`;
 
   if (!isOpen) return null;
@@ -153,7 +154,11 @@ export const PremiumMembershipModal: React.FC<PremiumMembershipModalProps> = ({
           </h2>
 
           <p className="text-xs sm:text-sm text-slate-300 max-w-lg mx-auto">
-            Upgrade to MindForge PRO for just <span className="text-emerald-400 font-bold font-mono">₹{MEMBERSHIP_FEE_INR} INR</span> and enjoy <span className="text-amber-400 font-black">5X Multiplier</span> on all earned Coins, Diamonds, & Brain Experience!
+            {isMasterAdmin ? (
+              <span className="text-amber-300 font-bold">👑 Master Admin Pass Active: PRO VIP & 5X Multipliers are 100% FREE for jeevangowda345s@gmail.com!</span>
+            ) : (
+              <>Upgrade to MindForge PRO for just <span className="text-emerald-400 font-bold font-mono">₹{MEMBERSHIP_FEE_INR} INR</span> and enjoy <span className="text-amber-400 font-black">5X Multiplier</span> on all earned Coins, Diamonds, & Brain Experience!</>
+            )}
           </p>
         </div>
 

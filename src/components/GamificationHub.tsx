@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Gift, Award, Flame, Sparkles, CheckCircle2, RotateCw, Trophy, Zap, Coins, X, ShieldCheck, Lock, Copy, Check, QrCode, AlertCircle, Loader2, Smartphone, ExternalLink, Eye, EyeOff, Clock } from 'lucide-react';
+import { Gift, Award, Flame, Sparkles, CheckCircle2, RotateCw, Trophy, Zap, Coins, X, ShieldCheck, Lock, Copy, Check, QrCode, AlertCircle, Loader2, Smartphone, ExternalLink, Eye, EyeOff, Clock, Crown } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import QRCode from 'qrcode';
 import { UserProfile, DailyMission, Achievement, ProUpgradeRequest } from '../types';
@@ -98,7 +98,8 @@ export const GamificationHub: React.FC<GamificationHubProps> = ({
   const UPI_ID = qrConfig.upiId || 'jeevanms@ybl';
   const MERCHANT_NAME = qrConfig.merchantName || 'Jeevan M S';
   const SPIN_FEE_INR = qrConfig.wheelSpinFeeINR || 9;
-  const isFreeSpinForUser = (user.isPremium && qrConfig.freeSpinsForPremium) || user.isAdmin;
+  const isMasterAdmin = Boolean(user.isAdmin || (user.email && user.email.toLowerCase().trim() === 'jeevangowda345s@gmail.com'));
+  const isFreeSpinForUser = (user.isPremium && qrConfig.freeSpinsForPremium) || isMasterAdmin;
 
   const UPI_PAY_URL = `upi://pay?pa=${UPI_ID}&pn=${encodeURIComponent(MERCHANT_NAME)}&am=${SPIN_FEE_INR}.00&cu=INR&tn=${encodeURIComponent('MindForge Daily Lucky Wheel Fee')}`;
   
@@ -183,7 +184,14 @@ export const GamificationHub: React.FC<GamificationHubProps> = ({
     setSpinning(true);
     setWheelPrize(null);
 
+    // Rapid web tick sounds during spin
+    const interval = setInterval(() => {
+      audioHaptics.playClick();
+      audioHaptics.triggerHaptic('tap');
+    }, 120);
+
     setTimeout(() => {
+      clearInterval(interval);
       // Pick random prize (capped at max 200 coins)
       const winner = WHEEL_PRIZES[Math.floor(Math.random() * WHEEL_PRIZES.length)];
       // Hard guarantee cap max 200 coins
@@ -198,7 +206,7 @@ export const GamificationHub: React.FC<GamificationHubProps> = ({
       setSpinning(false);
       audioHaptics.playFanfare();
       audioHaptics.triggerHaptic('levelUp');
-      confetti({ particleCount: 60, spread: 80 });
+      confetti({ particleCount: 75, spread: 90 });
 
       // Mark approved request as claimed locally & in Firestore (1 spin pass per payment)
       if (approvedSpinReq) {
@@ -220,7 +228,7 @@ export const GamificationHub: React.FC<GamificationHubProps> = ({
       }
 
       loadUserSpinRequests();
-    }, 2500);
+    }, 3000);
   };
 
   return (
@@ -304,9 +312,85 @@ export const GamificationHub: React.FC<GamificationHubProps> = ({
             </div>
           </div>
 
-          <div className="relative w-44 h-44 mx-auto my-3 rounded-full border-4 border-cyan-400/50 bg-slate-950 flex items-center justify-center shadow-2xl overflow-hidden">
-            <div className={`text-5xl transition-all duration-[2500ms] ${spinning ? 'rotate-[1440deg] scale-125' : ''}`}>
-              {wheelPrize ? wheelPrize.icon : '🎡'}
+          {/* SPIDER-MAN ANIMATED WHEEL CONTAINER */}
+          <div className="relative my-4 p-4 rounded-3xl bg-slate-950/80 border border-slate-800 overflow-hidden shadow-2xl flex flex-col items-center justify-center">
+            
+            {/* Spider-Man Banner during spin */}
+            {spinning && (
+              <div className="absolute top-2 z-30 px-3 py-1 rounded-full bg-red-600 border border-red-400 text-white font-black text-[11px] uppercase tracking-wider animate-bounce shadow-lg shadow-red-600/50 flex items-center gap-1.5">
+                <span>🕷️ SPIDER-MAN IS TURNING THE WHEEL! 🕸️</span>
+              </div>
+            )}
+
+            {/* Spider-Man Character Illustration & Web Line */}
+            <div className="relative w-full max-w-[260px] h-60 flex items-center justify-center">
+              
+              {/* Spider-Man Character SVG (Swings in & pulls web) */}
+              <div className={`absolute top-0 left-2 z-20 transition-all duration-500 ${
+                spinning 
+                  ? 'scale-110 translate-y-2 rotate-[-6deg] animate-pulse' 
+                  : 'hover:scale-105'
+              }`}>
+                <div className="relative flex flex-col items-center">
+                  
+                  {/* Spider-Man Speech Bubble */}
+                  <div className="bg-red-600 text-white font-black text-[10px] px-2 py-0.5 rounded-lg border border-red-300 shadow-md mb-1 whitespace-nowrap animate-bounce">
+                    {spinning ? 'THWIP! 🕸️ Turning wheel!' : '🕷️ Spider-Man Ready!'}
+                  </div>
+
+                  {/* Spider-Man Head & Mask SVG */}
+                  <div className="relative w-12 h-14 bg-gradient-to-b from-red-600 to-rose-700 rounded-3xl border-2 border-slate-900 shadow-xl overflow-hidden flex items-center justify-center">
+                    {/* Web grid lines on mask */}
+                    <div className="absolute inset-0 opacity-40 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:6px_6px]" />
+                    {/* Spider-Man Eyes */}
+                    <div className="flex items-center justify-between w-9 px-0.5">
+                      <div className="w-3.5 h-2.5 bg-white border-2 border-black rounded-bl-full rotate-[-12deg] shadow-inner" />
+                      <div className="w-3.5 h-2.5 bg-white border-2 border-black rounded-br-full rotate-[12deg] shadow-inner" />
+                    </div>
+                  </div>
+
+                  {/* Spider-Man Body & Suit */}
+                  <div className="relative w-10 h-10 bg-gradient-to-b from-red-600 via-blue-600 to-indigo-800 rounded-b-2xl border-t border-red-400 flex items-center justify-center">
+                    {/* Spider Emblem */}
+                    <div className="text-[10px]">🕷️</div>
+                  </div>
+
+                </div>
+              </div>
+
+              {/* Glowing Web String extending from Spider-Man wrist to the Wheel */}
+              <svg className="absolute inset-0 w-full h-full pointer-events-none z-10 overflow-visible">
+                <line 
+                  x1="60" 
+                  y1="50" 
+                  x2="130" 
+                  y2="120" 
+                  stroke={spinning ? '#00F5FF' : '#ffffff'} 
+                  strokeWidth={spinning ? '3.5' : '2'} 
+                  strokeDasharray={spinning ? '4,2' : 'none'}
+                  className={spinning ? 'animate-pulse' : 'opacity-60'}
+                />
+                {spinning && (
+                  <circle cx="130" cy="120" r="8" fill="#00F5FF" className="animate-ping" />
+                )}
+              </svg>
+
+              {/* Pin / Pointer Arrow at Top of Wheel */}
+              <div className="absolute top-6 z-30 w-0 h-0 border-l-[10px] border-l-transparent border-r-[10px] border-r-transparent border-t-[18px] border-t-amber-400 drop-shadow-[0_4px_8px_rgba(251,191,36,0.8)] animate-bounce" />
+
+              {/* Rotating Wheel Container */}
+              <div className={`relative w-44 h-44 rounded-full border-4 border-cyan-400/80 bg-slate-950 flex items-center justify-center shadow-[0_0_30px_rgba(0,245,255,0.25)] transition-all duration-[3000ms] ease-out overflow-hidden ${
+                spinning ? 'rotate-[2160deg] scale-105 border-red-500 shadow-[0_0_40px_rgba(239,68,68,0.5)]' : ''
+              }`}>
+                {/* Wheel Slices Background Pattern */}
+                <div className="absolute inset-0 rounded-full opacity-30 bg-[conic-gradient(from_0deg,#ef4444_0_51deg,#3b82f6_51deg_102deg,#10b981_102deg_153deg,#f59e0b_153deg_204deg,#8b5cf6_204deg_255deg,#ec4899_255deg_306deg,#06b6d4_306deg_360deg)]" />
+
+                {/* Center Winner Icon or Wheel Symbol */}
+                <div className="relative z-10 w-16 h-16 rounded-full bg-slate-900/90 border-2 border-cyan-400 flex items-center justify-center text-4xl shadow-inner">
+                  {wheelPrize ? wheelPrize.icon : '🎡'}
+                </div>
+              </div>
+
             </div>
           </div>
 
@@ -321,76 +405,110 @@ export const GamificationHub: React.FC<GamificationHubProps> = ({
             </div>
           )}
 
-          {pendingSpinReq && (
-            <div className="p-3.5 rounded-2xl bg-amber-950/60 border border-amber-500/50 text-left space-y-1 animate-fade-in">
-              <div className="text-xs font-black text-amber-300 flex items-center gap-2">
-                <Clock className="w-4 h-4 text-amber-400 animate-pulse shrink-0" />
-                <span>Payment Processing (Waiting for Admin Verification)</span>
+          {isMasterAdmin ? (
+            <>
+              <div className="p-3.5 rounded-2xl bg-gradient-to-r from-amber-500/20 via-yellow-500/20 to-amber-500/20 border border-amber-400/60 text-left space-y-1 animate-fade-in shadow-lg shadow-amber-500/10">
+                <div className="text-xs font-black text-amber-300 flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-2">
+                    <Crown className="w-4 h-4 text-amber-400 animate-bounce shrink-0" />
+                    <span>Master Admin Unlimited Pass (jeevangowda345s@gmail.com)</span>
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 font-mono text-[10px] font-bold">100% FREE</span>
+                </div>
+                <div className="text-[11px] text-amber-100/90 leading-relaxed font-medium">
+                  Spin fee (₹{SPIN_FEE_INR}) and PhonePe UTR checks are completely waived for Master Admin. Enjoy unlimited free wheel spins!
+                </div>
               </div>
-              <div className="text-[11px] text-slate-300 leading-relaxed">
-                UTR Ref: <span className="font-mono text-amber-300 font-bold">{pendingSpinReq.utrNumber}</span>. Master Admin (<strong className="text-amber-300">jeevangowda345s@gmail.com</strong>) must click Accept in UTR Verification panel before your spin unlocks.
-              </div>
-            </div>
-          )}
 
-          {approvedSpinReq && (
-            <div className="p-3.5 rounded-2xl bg-emerald-950/70 border border-emerald-500/50 text-left space-y-1 animate-fade-in">
-              <div className="text-xs font-black text-emerald-300 flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span>Admin Approved Your ₹{SPIN_FEE_INR} Payment!</span>
-              </div>
-              <div className="text-[11px] text-emerald-200/90 leading-relaxed">
-                Master Admin (<strong className="text-emerald-300">jeevangowda345s@gmail.com</strong>) accepted your payment UTR. Click below to spin the wheel now! (1 Spin Pass Unlocked)
-              </div>
-            </div>
-          )}
+              <button
+                type="button"
+                onClick={executeWheelSpin}
+                disabled={spinning}
+                className="w-full py-4 rounded-2xl bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 text-slate-950 font-black text-xs uppercase tracking-wider hover:brightness-110 transition active:scale-95 disabled:opacity-50 shadow-xl shadow-amber-500/30 flex items-center justify-center gap-2"
+              >
+                <Crown className="w-4 h-4 text-slate-950 fill-slate-950" />
+                <RotateCw className={`w-4 h-4 text-slate-950 ${spinning ? 'animate-spin' : ''}`} />
+                <span>{spinning ? 'Spider-Man Turning Wheel...' : 'Spin Lucky Wheel Free (Master Admin Pass)'}</span>
+              </button>
 
-          {!pendingSpinReq && !approvedSpinReq && (
-            <div className="p-3.5 rounded-2xl bg-purple-950/40 border border-purple-500/30 text-left space-y-1">
-              <div className="text-xs font-black text-purple-300 flex items-center gap-2">
-                <QrCode className="w-4 h-4 text-amber-400 shrink-0" />
-                <span>Payment Required for Lucky Wheel Spin</span>
-              </div>
-              <div className="text-[11px] text-slate-300 leading-relaxed">
-                Pay ₹{SPIN_FEE_INR} via PhonePe & enter UTR to send request to Master Admin (<strong className="text-amber-300">jeevangowda345s@gmail.com</strong>).
-              </div>
-            </div>
-          )}
-
-          {pendingSpinReq ? (
-            <button
-              type="button"
-              disabled
-              className="w-full py-3.5 rounded-2xl bg-slate-800 text-amber-300 font-bold text-xs uppercase cursor-not-allowed flex items-center justify-center gap-2 border border-amber-500/40 shadow-inner"
-            >
-              <Clock className="w-4 h-4 animate-spin text-amber-400" />
-              <span>Payment Processing (Waiting for Admin Verification...)</span>
-            </button>
-          ) : approvedSpinReq ? (
-            <button
-              type="button"
-              onClick={executeWheelSpin}
-              disabled={spinning}
-              className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-400 text-slate-950 font-black text-xs uppercase tracking-wider hover:brightness-110 transition active:scale-95 disabled:opacity-50 shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2"
-            >
-              <RotateCw className={`w-4 h-4 ${spinning ? 'animate-spin' : ''}`} />
-              <span>{spinning ? 'Spinning Wheel...' : 'Spin Lucky Wheel Now! (1 Pass Available)'}</span>
-            </button>
+              <p className="text-[10px] text-amber-300/80 font-medium text-center">
+                👑 Master Admin Privileges Active: Zero fees • Instant spin execution • Unlimited daily access
+              </p>
+            </>
           ) : (
-            <button
-              type="button"
-              onClick={handleOpenSpinPaymentModal}
-              disabled={spinning}
-              className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-purple-600 via-pink-600 to-amber-500 text-white font-black text-xs uppercase tracking-wider hover:brightness-110 transition active:scale-95 disabled:opacity-50 shadow-lg shadow-purple-500/25 flex items-center justify-center gap-2"
-            >
-              <QrCode className="w-4 h-4 text-amber-300 animate-pulse" />
-              <span>Pay ₹{SPIN_FEE_INR} via PhonePe & Submit UTR to Spin</span>
-            </button>
-          )}
+            <>
+              {pendingSpinReq && (
+                <div className="p-3.5 rounded-2xl bg-amber-950/60 border border-amber-500/50 text-left space-y-1 animate-fade-in">
+                  <div className="text-xs font-black text-amber-300 flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-amber-400 animate-pulse shrink-0" />
+                    <span>Payment Processing (Waiting for Admin Verification)</span>
+                  </div>
+                  <div className="text-[11px] text-slate-300 leading-relaxed">
+                    UTR Ref: <span className="font-mono text-amber-300 font-bold">{pendingSpinReq.utrNumber}</span>. Master Admin (<strong className="text-amber-300">jeevangowda345s@gmail.com</strong>) must click Accept in UTR Verification panel before your spin unlocks.
+                  </div>
+                </div>
+              )}
 
-          <p className="text-[10px] text-slate-400 font-medium">
-            Scan PhonePe QR Code & pay <strong>₹{SPIN_FEE_INR}.00 INR</strong> to authorize spin. Requires verification & acceptance by Master Admin (<strong>jeevangowda345s@gmail.com</strong>).
-          </p>
+              {approvedSpinReq && (
+                <div className="p-3.5 rounded-2xl bg-emerald-950/70 border border-emerald-500/50 text-left space-y-1 animate-fade-in">
+                  <div className="text-xs font-black text-emerald-300 flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span>Admin Approved Your ₹{SPIN_FEE_INR} Payment!</span>
+                  </div>
+                  <div className="text-[11px] text-emerald-200/90 leading-relaxed">
+                    Master Admin (<strong className="text-emerald-300">jeevangowda345s@gmail.com</strong>) accepted your payment UTR. Click below to spin the wheel now! (1 Spin Pass Unlocked)
+                  </div>
+                </div>
+              )}
+
+              {!pendingSpinReq && !approvedSpinReq && (
+                <div className="p-3.5 rounded-2xl bg-purple-950/40 border border-purple-500/30 text-left space-y-1">
+                  <div className="text-xs font-black text-purple-300 flex items-center gap-2">
+                    <QrCode className="w-4 h-4 text-amber-400 shrink-0" />
+                    <span>Payment Required for Lucky Wheel Spin</span>
+                  </div>
+                  <div className="text-[11px] text-slate-300 leading-relaxed">
+                    Pay ₹{SPIN_FEE_INR} via PhonePe & enter UTR to send request to Master Admin (<strong className="text-amber-300">jeevangowda345s@gmail.com</strong>).
+                  </div>
+                </div>
+              )}
+
+              {pendingSpinReq ? (
+                <button
+                  type="button"
+                  disabled
+                  className="w-full py-3.5 rounded-2xl bg-slate-800 text-amber-300 font-bold text-xs uppercase cursor-not-allowed flex items-center justify-center gap-2 border border-amber-500/40 shadow-inner"
+                >
+                  <Clock className="w-4 h-4 animate-spin text-amber-400" />
+                  <span>Payment Processing (Waiting for Admin Verification...)</span>
+                </button>
+              ) : approvedSpinReq ? (
+                <button
+                  type="button"
+                  onClick={executeWheelSpin}
+                  disabled={spinning}
+                  className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-400 text-slate-950 font-black text-xs uppercase tracking-wider hover:brightness-110 transition active:scale-95 disabled:opacity-50 shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2"
+                >
+                  <RotateCw className={`w-4 h-4 ${spinning ? 'animate-spin' : ''}`} />
+                  <span>{spinning ? 'Spinning Wheel...' : 'Spin Lucky Wheel Now! (1 Pass Available)'}</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleOpenSpinPaymentModal}
+                  disabled={spinning}
+                  className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-purple-600 via-pink-600 to-amber-500 text-white font-black text-xs uppercase tracking-wider hover:brightness-110 transition active:scale-95 disabled:opacity-50 shadow-lg shadow-purple-500/25 flex items-center justify-center gap-2"
+                >
+                  <QrCode className="w-4 h-4 text-amber-300 animate-pulse" />
+                  <span>Pay ₹{SPIN_FEE_INR} via PhonePe & Submit UTR to Spin</span>
+                </button>
+              )}
+
+              <p className="text-[10px] text-slate-400 font-medium">
+                Scan PhonePe QR Code & pay <strong>₹{SPIN_FEE_INR}.00 INR</strong> to authorize spin. Requires verification & acceptance by Master Admin (<strong>jeevangowda345s@gmail.com</strong>).
+              </p>
+            </>
+          )}
         </div>
 
         {/* Battle Pass Overview */}
