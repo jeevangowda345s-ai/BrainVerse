@@ -25,7 +25,7 @@ import QRCode from 'qrcode';
 import confetti from 'canvas-confetti';
 import { UserProfile, ProUpgradeRequest } from '../types';
 import { audioHaptics } from '../utils/audioHaptics';
-import { loadQRMerchantConfig, saveUserProfile, saveProUpgradeRequest, maskUpiId } from '../utils/storage';
+import { loadQRMerchantConfig, saveUserProfile, loadProUpgradeRequests, saveProUpgradeRequest, maskUpiId } from '../utils/storage';
 import { saveUserProfileToFirestore, submitProUpgradeRequestToFirestore } from '../services/firebaseService';
 
 interface PremiumMembershipModalProps {
@@ -49,6 +49,19 @@ export const PremiumMembershipModal: React.FC<PremiumMembershipModalProps> = ({
   const [isVerifying, setIsVerifying] = useState(false);
   const [isSubmittedPending, setIsSubmittedPending] = useState(false);
   const [submittedUtr, setSubmittedUtr] = useState<string>('');
+
+  useEffect(() => {
+    if (isOpen) {
+      const local = loadProUpgradeRequests();
+      const pending = local.find(
+        r => (r.userId === user.id || r.userEmail === user.email) && r.status === 'pending' && r.paymentType === 'PRO_MEMBERSHIP'
+      );
+      if (pending) {
+        setIsSubmittedPending(true);
+        setSubmittedUtr(pending.utrNumber);
+      }
+    }
+  }, [isOpen, user.id, user.email]);
 
   const qrConfig = loadQRMerchantConfig();
   const merchantUpi = qrConfig.upiId || 'jeevanms@ybl';

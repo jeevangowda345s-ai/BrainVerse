@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Gift, Award, Flame, Sparkles, CheckCircle2, RotateCw, Trophy, Zap, Coins, X, ShieldCheck, Lock, Copy, Check, QrCode, AlertCircle, Loader2, Smartphone, ExternalLink, Eye, EyeOff } from 'lucide-react';
+import { Gift, Award, Flame, Sparkles, CheckCircle2, RotateCw, Trophy, Zap, Coins, X, ShieldCheck, Lock, Copy, Check, QrCode, AlertCircle, Loader2, Smartphone, ExternalLink, Eye, EyeOff, Clock } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import QRCode from 'qrcode';
 import { UserProfile, DailyMission, Achievement, ProUpgradeRequest } from '../types';
 import { audioHaptics } from '../utils/audioHaptics';
-import { loadQRMerchantConfig, saveProUpgradeRequest, maskUpiId } from '../utils/storage';
-import { submitProUpgradeRequestToFirestore } from '../services/firebaseService';
+import { loadQRMerchantConfig, loadProUpgradeRequests, saveProUpgradeRequest, maskUpiId } from '../utils/storage';
+import { submitProUpgradeRequestToFirestore, fetchProUpgradeRequestsFromFirestore } from '../services/firebaseService';
 
 export interface WheelReward {
   label: string;
@@ -60,6 +60,36 @@ export const GamificationHub: React.FC<GamificationHubProps> = ({
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [copiedUpi, setCopiedUpi] = useState<boolean>(false);
   const [revealUpi, setRevealUpi] = useState<boolean>(false);
+  const [submittedUtrPending, setSubmittedUtrPending] = useState<string | null>(null);
+
+  // UTR Request tracking for wheel spin
+  const [spinRequests, setSpinRequests] = useState<ProUpgradeRequest[]>([]);
+
+  const loadUserSpinRequests = async () => {
+    const local = loadProUpgradeRequests();
+    let remote: ProUpgradeRequest[] = [];
+    try {
+      remote = await fetchProUpgradeRequestsFromFirestore();
+    } catch (e) {}
+
+    const map = new Map<string, ProUpgradeRequest>();
+    remote.forEach(r => map.set(r.id, r));
+    local.forEach(r => {
+      if (!map.has(r.id)) map.set(r.id, r);
+    });
+
+    const userReqs = Array.from(map.values()).filter(
+      r => (r.userId === user.id || r.userEmail === user.email) && r.paymentType === 'WHEEL_SPIN_FEE'
+    );
+    setSpinRequests(userReqs);
+  };
+
+  useEffect(() => {
+    loadUserSpinRequests();
+  }, [user.id, user.email, showSpinPaymentModal]);
+
+  const pendingSpinReq = spinRequests.find(r => r.status === 'pending');
+  const approvedSpinReq = spinRequests.find(r => r.status === 'approved');
 
   const todayStr = new Date().toISOString().split('T')[0];
   const hasSpunToday = user.lastWheelSpinDate === todayStr;
@@ -104,6 +134,7 @@ export const GamificationHub: React.FC<GamificationHubProps> = ({
   const handleOpenSpinPaymentModal = () => {
     setUtrNumber('');
     setPaymentError(null);
+    setSubmittedUtrPending(null);
     setShowSpinPaymentModal(true);
     audioHaptics.playClick();
   };
@@ -120,31 +151,28 @@ export const GamificationHub: React.FC<GamificationHubProps> = ({
     setVerifyingPayment(true);
     audioHaptics.playClick();
 
-    // Log Scanner Payment Record for Admin Scanner Payers List
+    // Log Wheel Spin Request with status 'pending' for Admin UTR Verification Rights approval
     const spinReq: ProUpgradeRequest = {
       id: 'spin_pay_' + Date.now(),
       userId: user.id || 'guest',
-      userName: user.name || 'Anonymous User',
+      userName: user.name || 'MindForge Scholar',
       userEmail: user.email || 'user@brainverse.app',
       utrNumber: cleanUtr,
       amountINR: SPIN_FEE_INR,
-      status: 'approved',
+      status: 'pending', // MUST BE PENDING UNTIL ADMIN (jeevangowda345s@gmail.com) ACCEPTS!
       timestamp: new Date().toISOString(),
       paymentType: 'WHEEL_SPIN_FEE'
     };
     saveProUpgradeRequest(spinReq);
     submitProUpgradeRequestToFirestore(spinReq).catch(e => console.warn(e));
 
-    // Secure SSL PhonePe Payment Verification Handshake
     setTimeout(() => {
       setVerifyingPayment(false);
-      setShowSpinPaymentModal(false);
+      setSubmittedUtrPending(cleanUtr);
       audioHaptics.playCorrect();
       audioHaptics.triggerHaptic('success');
-      
-      // Execute the wheel spin after payment verification
-      executeWheelSpin();
-    }, 1800);
+      loadUserSpinRequests();
+    }, 1200);
   };
 
   const executeWheelSpin = () => {
@@ -172,6 +200,12 @@ export const GamificationHub: React.FC<GamificationHubProps> = ({
       audioHaptics.triggerHaptic('levelUp');
       confetti({ particleCount: 60, spread: 80 });
 
+      // Mark approved request as claimed locally
+      if (approvedSpinReq) {
+        const consumedReq: ProUpgradeRequest = { ...approvedSpinReq, status: 'declined', declineReason: 'Claimed spin reward' };
+        saveProUpgradeRequest(consumedReq);
+      }
+
       if (onClaimWheelReward) {
         onClaimWheelReward({
           coins: safeWinner.coins,
@@ -183,6 +217,8 @@ export const GamificationHub: React.FC<GamificationHubProps> = ({
       } else if (safeWinner.coins > 0) {
         onUpdateCoins(safeWinner.coins);
       }
+
+      loadUserSpinRequests();
     }, 2500);
   };
 
@@ -284,15 +320,79 @@ export const GamificationHub: React.FC<GamificationHubProps> = ({
             </div>
           )}
 
-          <button
-            type="button"
-            onClick={handleOpenSpinPaymentModal}
-            disabled={spinning}
-            className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-purple-600 via-pink-600 to-amber-500 text-white font-black text-xs uppercase tracking-wider hover:brightness-110 transition active:scale-95 disabled:opacity-50 shadow-lg shadow-purple-500/25 flex items-center justify-center gap-2"
-          >
-            <QrCode className="w-4 h-4 text-amber-300 animate-pulse" />
-            <span>{spinning ? 'Spinning Wheel...' : 'Pay ₹9 via PhonePe & Spin Wheel'}</span>
-          </button>
+          {pendingSpinReq && (
+            <div className="p-3.5 rounded-2xl bg-amber-950/60 border border-amber-500/50 text-left space-y-1 animate-fade-in">
+              <div className="text-xs font-black text-amber-300 flex items-center gap-2">
+                <Clock className="w-4 h-4 text-amber-400 animate-pulse shrink-0" />
+                <span>Wheel Spin Payment Pending Admin Acceptance</span>
+              </div>
+              <div className="text-[11px] text-slate-300 leading-relaxed">
+                UTR Ref: <span className="font-mono text-amber-300 font-bold">{pendingSpinReq.utrNumber}</span>. Master Admin (<strong className="text-amber-300">jeevangowda345s@gmail.com</strong>) must click Accept in UTR Verification panel before your spin unlocks.
+              </div>
+            </div>
+          )}
+
+          {approvedSpinReq && !hasSpunToday && (
+            <div className="p-3.5 rounded-2xl bg-emerald-950/70 border border-emerald-500/50 text-left space-y-1 animate-fade-in">
+              <div className="text-xs font-black text-emerald-300 flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>Admin Approved Your ₹{SPIN_FEE_INR} Payment!</span>
+              </div>
+              <div className="text-[11px] text-emerald-200/90 leading-relaxed">
+                Master Admin (<strong className="text-emerald-300">jeevangowda345s@gmail.com</strong>) accepted your payment UTR. Click below to spin the wheel now!
+              </div>
+            </div>
+          )}
+
+          {pendingSpinReq ? (
+            <button
+              type="button"
+              disabled
+              className="w-full py-3.5 rounded-2xl bg-slate-800 text-slate-400 font-bold text-xs uppercase cursor-not-allowed flex items-center justify-center gap-2 border border-slate-700"
+            >
+              <Clock className="w-4 h-4 animate-spin text-amber-400" />
+              <span>Waiting for Admin UTR Approval...</span>
+            </button>
+          ) : (approvedSpinReq && !hasSpunToday) ? (
+            <button
+              type="button"
+              onClick={executeWheelSpin}
+              disabled={spinning}
+              className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-400 text-slate-950 font-black text-xs uppercase tracking-wider hover:brightness-110 transition active:scale-95 disabled:opacity-50 shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2"
+            >
+              <RotateCw className={`w-4 h-4 ${spinning ? 'animate-spin' : ''}`} />
+              <span>{spinning ? 'Spinning Wheel...' : 'Spin Lucky Wheel Now!'}</span>
+            </button>
+          ) : isFreeSpinForUser && !hasSpunToday ? (
+            <button
+              type="button"
+              onClick={executeWheelSpin}
+              disabled={spinning}
+              className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-black text-xs uppercase tracking-wider hover:brightness-110 transition active:scale-95 disabled:opacity-50 shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2"
+            >
+              <Sparkles className="w-4 h-4 text-slate-950" />
+              <span>{spinning ? 'Spinning...' : 'Free Daily PRO Wheel Spin'}</span>
+            </button>
+          ) : hasSpunToday ? (
+            <button
+              type="button"
+              disabled
+              className="w-full py-3.5 rounded-2xl bg-slate-800 text-slate-500 font-bold text-xs uppercase cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+              <span>Daily Spin Claimed for Today</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleOpenSpinPaymentModal}
+              disabled={spinning}
+              className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-purple-600 via-pink-600 to-amber-500 text-white font-black text-xs uppercase tracking-wider hover:brightness-110 transition active:scale-95 disabled:opacity-50 shadow-lg shadow-purple-500/25 flex items-center justify-center gap-2"
+            >
+              <QrCode className="w-4 h-4 text-amber-300 animate-pulse" />
+              <span>Pay ₹{SPIN_FEE_INR} via PhonePe & Submit UTR</span>
+            </button>
+          )}
 
           <p className="text-[10px] text-slate-400 font-medium">
             Scan PhonePe QR Code & pay <strong>₹9.00 INR</strong> to authorize spin. Spin the wheel to win exciting coins and brain score rewards!
@@ -457,105 +557,146 @@ export const GamificationHub: React.FC<GamificationHubProps> = ({
 
             <div className="p-6 space-y-5">
               
-              {/* Fee & Merchant Information */}
-              <div className="p-4 rounded-2xl bg-purple-950/30 border border-purple-500/30 text-center space-y-1">
-                <div className="text-xs text-purple-300 font-bold uppercase tracking-wider">Lucky Wheel Fee</div>
-                <div className="text-3xl font-black text-amber-400 font-mono">
-                  ₹{SPIN_FEE_INR}.00 <span className="text-xs text-slate-300 font-sans font-normal">INR</span>
-                </div>
-                <div className="text-xs text-slate-300 pt-1 flex items-center justify-center gap-1.5 flex-wrap">
-                  <span>Merchant: <strong className="text-white">{MERCHANT_NAME}</strong></span>
-                </div>
-                <div className="text-[11px] text-emerald-400 font-semibold flex items-center justify-center gap-1 mt-1">
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> NPCI Instant UPI Merchant Verification
-                </div>
-              </div>
-
-              {/* Spotify Style Checkout Link Card */}
-              <div className="p-5 rounded-2xl bg-gradient-to-br from-slate-950 via-slate-900 to-purple-950/60 border border-purple-500/30 text-center space-y-4 shadow-xl">
-                <div className="space-y-1">
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-black uppercase tracking-widest">
-                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Direct Payment Checkout Link</span>
+              {(submittedUtrPending || pendingSpinReq) ? (
+                <div className="p-6 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-900 to-purple-950/80 border border-purple-500/40 text-center space-y-4 shadow-xl animate-fade-in">
+                  <div className="w-14 h-14 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/40 flex items-center justify-center mx-auto shadow-lg shadow-amber-500/20">
+                    <Clock className="w-7 h-7 animate-pulse" />
                   </div>
-                  <h4 className="text-base font-black text-white">Daily Lucky Wheel Spin Pass</h4>
-                  <div className="text-2xl font-black text-amber-400 font-mono">
-                    ₹{SPIN_FEE_INR}.00 <span className="text-xs text-slate-400 font-sans font-normal">INR</span>
+                  <div className="space-y-1">
+                    <span className="px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-black uppercase tracking-widest">
+                      ⏳ Pending Admin Approval
+                    </span>
+                    <h4 className="text-xl font-black text-white pt-2">UTR Payment Request Sent!</h4>
+                    <div className="text-sm font-mono text-amber-300 font-bold tracking-wider">
+                      UTR Reference: {submittedUtrPending || pendingSpinReq?.utrNumber}
+                    </div>
                   </div>
+                  <p className="text-xs text-slate-300 leading-relaxed max-w-md mx-auto">
+                    Your <strong className="text-emerald-400">₹{SPIN_FEE_INR}</strong> Wheel Spin payment has been sent to Master Admin (<span className="text-amber-300 font-mono font-bold">jeevangowda345s@gmail.com</span>).
+                  </p>
+                  <div className="p-3.5 rounded-xl bg-slate-950/90 border border-amber-500/30 text-xs text-slate-300 text-left space-y-1.5">
+                    <div className="font-bold text-amber-300 flex items-center gap-1.5">
+                      <ShieldCheck className="w-4 h-4 text-amber-400" />
+                      <span>Admin Approval Required:</span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 leading-normal">
+                      You must wait until Master Admin (<strong className="text-amber-300">jeevangowda345s@gmail.com</strong>) accepts your payment by clicking the Accept button in the "UTR Verification Rights & PRO User Approvals" panel. Once accepted, your Lucky Wheel Spin will unlock automatically!
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowSpinPaymentModal(false);
+                      setSubmittedUtrPending(null);
+                    }}
+                    className="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs uppercase transition"
+                  >
+                    Close & Return to Wheel
+                  </button>
                 </div>
+              ) : (
+                <>
+                  {/* Fee & Merchant Information */}
+                  <div className="p-4 rounded-2xl bg-purple-950/30 border border-purple-500/30 text-center space-y-1">
+                    <div className="text-xs text-purple-300 font-bold uppercase tracking-wider">Lucky Wheel Fee</div>
+                    <div className="text-3xl font-black text-amber-400 font-mono">
+                      ₹{SPIN_FEE_INR}.00 <span className="text-xs text-slate-300 font-sans font-normal">INR</span>
+                    </div>
+                    <div className="text-xs text-slate-300 pt-1 flex items-center justify-center gap-1.5 flex-wrap">
+                      <span>Merchant: <strong className="text-white">{MERCHANT_NAME}</strong></span>
+                    </div>
+                    <div className="text-[11px] text-emerald-400 font-semibold flex items-center justify-center gap-1 mt-1">
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> NPCI Instant UPI Merchant Verification
+                    </div>
+                  </div>
 
-                {/* Direct Checkout Button */}
-                <a
-                  href={qrConfig.paymentLink || UPI_PAY_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() => audioHaptics.playClick()}
-                  className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-500 hover:from-purple-500 hover:to-indigo-500 text-white font-black text-xs uppercase tracking-wider transition shadow-lg shadow-purple-500/20 flex items-center justify-center gap-2 group"
-                >
-                  <Zap className="w-4 h-4 text-amber-300 fill-amber-300" />
-                  <span>Pay via Direct Checkout Link</span>
-                  <ExternalLink className="w-3.5 h-3.5 text-purple-200 group-hover:translate-x-0.5 transition-transform" />
-                </a>
+                  {/* Spotify Style Checkout Link Card */}
+                  <div className="p-5 rounded-2xl bg-gradient-to-br from-slate-950 via-slate-900 to-purple-950/60 border border-purple-500/30 text-center space-y-4 shadow-xl">
+                    <div className="space-y-1">
+                      <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-black uppercase tracking-widest">
+                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>Direct Payment Checkout Link</span>
+                      </div>
+                      <h4 className="text-base font-black text-white">Daily Lucky Wheel Spin Pass</h4>
+                      <div className="text-2xl font-black text-amber-400 font-mono">
+                        ₹{SPIN_FEE_INR}.00 <span className="text-xs text-slate-400 font-sans font-normal">INR</span>
+                      </div>
+                    </div>
 
-                <p className="text-[10px] text-slate-400">
-                  Clicking opens direct secure checkout to pay ₹{SPIN_FEE_INR} to {MERCHANT_NAME}.
-                </p>
-              </div>
+                    {/* Direct Checkout Button */}
+                    <a
+                      href={qrConfig.paymentLink || UPI_PAY_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => audioHaptics.playClick()}
+                      className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-500 hover:from-purple-500 hover:to-indigo-500 text-white font-black text-xs uppercase tracking-wider transition shadow-lg shadow-purple-500/20 flex items-center justify-center gap-2 group"
+                    >
+                      <Zap className="w-4 h-4 text-amber-300 fill-amber-300" />
+                      <span>Pay via Direct Checkout Link</span>
+                      <ExternalLink className="w-3.5 h-3.5 text-purple-200 group-hover:translate-x-0.5 transition-transform" />
+                    </a>
 
-              {/* UTR Reference Verification Input */}
-              <div className="space-y-2 pt-2 border-t border-slate-800">
-                <label className="block text-xs font-bold text-slate-300">
-                  Enter 12-Digit UPI UTR / Ref No. <span className="text-pink-400">*</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    maxLength={12}
-                    placeholder="e.g. 420918273645"
-                    value={utrNumber}
-                    onChange={(e) => setUtrNumber(e.target.value.replace(/\D/g, ''))}
-                    className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-amber-400 font-mono font-bold text-sm tracking-widest focus:outline-none focus:border-purple-500 transition"
-                  />
-                  <Lock className="w-4 h-4 text-slate-500 absolute right-3.5 top-3.5" />
-                </div>
-                <p className="text-[10px] text-slate-400">
-                  Found in your UPI app transaction details after paying ₹{SPIN_FEE_INR} to {MERCHANT_NAME}.
-                </p>
-              </div>
+                    <p className="text-[10px] text-slate-400">
+                      Clicking opens direct secure checkout to pay ₹{SPIN_FEE_INR} to {MERCHANT_NAME}.
+                    </p>
+                  </div>
 
-              {paymentError && (
-                <div className="p-3 rounded-xl bg-rose-950/60 border border-rose-500/50 text-rose-300 text-xs font-bold flex items-start gap-2 animate-shake">
-                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-400 mt-0.5" />
-                  <span>{paymentError}</span>
-                </div>
-              )}
+                  {/* UTR Reference Verification Input */}
+                  <div className="space-y-2 pt-2 border-t border-slate-800">
+                    <label className="block text-xs font-bold text-slate-300">
+                      Enter 12-Digit UPI UTR / Ref No. <span className="text-pink-400">*</span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        maxLength={12}
+                        placeholder="e.g. 420918273645"
+                        value={utrNumber}
+                        onChange={(e) => setUtrNumber(e.target.value.replace(/\D/g, ''))}
+                        className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-amber-400 font-mono font-bold text-sm tracking-widest focus:outline-none focus:border-purple-500 transition"
+                      />
+                      <Lock className="w-4 h-4 text-slate-500 absolute right-3.5 top-3.5" />
+                    </div>
+                    <p className="text-[10px] text-slate-400">
+                      Found in your PhonePe / UPI transaction details after paying ₹{SPIN_FEE_INR} to {MERCHANT_NAME}.
+                    </p>
+                  </div>
 
-              {/* Action Buttons */}
-              <div className="space-y-2 pt-2">
-                <button
-                  type="button"
-                  onClick={handleVerifySpinPaymentAndSpin}
-                  disabled={verifyingPayment || utrNumber.length !== 12}
-                  className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-purple-600 via-pink-600 to-amber-500 text-white font-black text-xs uppercase tracking-wider hover:brightness-110 transition active:scale-95 disabled:opacity-50 shadow-lg shadow-purple-500/20 flex items-center justify-center gap-2"
-                >
-                  {verifyingPayment ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin text-amber-300" />
-                      <span>Verifying ₹9 PhonePe Gateway Deposit...</span>
-                    </>
-                  ) : (
-                    <>
-                      <ShieldCheck className="w-4 h-4 text-amber-300" />
-                      <span>Verify ₹9 Payment & Spin Wheel</span>
-                    </>
+                  {paymentError && (
+                    <div className="p-3 rounded-xl bg-rose-950/60 border border-rose-500/50 text-rose-300 text-xs font-bold flex items-start gap-2 animate-shake">
+                      <AlertCircle className="w-4 h-4 shrink-0 text-rose-400 mt-0.5" />
+                      <span>{paymentError}</span>
+                    </div>
                   )}
-                </button>
 
-                <div className="flex items-center justify-center gap-1.5 text-[10px] text-slate-400 pt-1 font-mono">
-                  <Lock className="w-3 h-3 text-emerald-400" />
-                  <span>256-bit Secured PhonePe Merchant Verification</span>
-                </div>
-              </div>
+                  {/* Action Buttons */}
+                  <div className="space-y-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={handleVerifySpinPaymentAndSpin}
+                      disabled={verifyingPayment || utrNumber.length !== 12}
+                      className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-purple-600 via-pink-600 to-amber-500 text-white font-black text-xs uppercase tracking-wider hover:brightness-110 transition active:scale-95 disabled:opacity-50 shadow-lg shadow-purple-500/20 flex items-center justify-center gap-2"
+                    >
+                      {verifyingPayment ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin text-amber-300" />
+                          <span>Submitting UTR to Master Admin...</span>
+                        </>
+                      ) : (
+                        <>
+                          <ShieldCheck className="w-4 h-4 text-amber-300" />
+                          <span>Submit UTR for Admin Verification</span>
+                        </>
+                      )}
+                    </button>
+
+                    <div className="flex items-center justify-center gap-1.5 text-[10px] text-slate-400 pt-1 font-mono">
+                      <Lock className="w-3 h-3 text-emerald-400" />
+                      <span>Admin Acceptance Required before Spin Activation</span>
+                    </div>
+                  </div>
+                </>
+              )}
 
             </div>
 

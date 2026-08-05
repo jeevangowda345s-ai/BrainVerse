@@ -118,7 +118,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     loadAllProRequests();
   }, []);
 
-  // Accept / Approve User PRO Membership
+  // Accept / Approve User Payment Request (PRO Membership, Wheel Spin, etc.)
   const handleApproveProRequest = async (req: ProUpgradeRequest) => {
     // Play Payment Successful Sound Effect Chime!
     audioHaptics.playPaymentSuccess();
@@ -129,25 +129,38 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
     await updateProUpgradeRequestInFirestore(req.id, req.userId, 'approved');
 
-    // Grant PRO Membership in Firestore for the user
-    if (req.userId) {
-      await adminUpdateUserProfileInFirestore(req.userId, { isPremium: true }).catch(e => console.warn(e));
+    if (req.paymentType === 'WHEEL_SPIN_FEE') {
+      if (req.userId) {
+        await adminUpdateUserProfileInFirestore(req.userId, { lastWheelSpinDate: '' }).catch(e => console.warn(e));
+      }
+      if (req.userId === user.id || user.email === req.userEmail) {
+        const updatedUser = { ...user, lastWheelSpinDate: '' };
+        if (onUpdateUser) onUpdateUser(updatedUser);
+        saveUserProfile(updatedUser);
+      }
+      setProActionMsg(`APPROVED! Wheel Spin payment of ₹${req.amountINR} verified for "${req.userName}". Spin unlocked!`);
+    } else {
+      // Grant PRO Membership in Firestore for the user
+      if (req.userId) {
+        await adminUpdateUserProfileInFirestore(req.userId, { isPremium: true }).catch(e => console.warn(e));
+      }
+
+      // Update registered users list
+      setAllRegisteredUsers(prev =>
+        prev.map(u => (u.id === req.userId || u.email === req.userEmail) ? { ...u, isPremium: true } : u)
+      );
+
+      // If current user is target user, upgrade active session as well
+      if (req.userId === user.id || user.email === req.userEmail) {
+        const updatedUser = { ...user, isPremium: true };
+        if (onUpdateUser) onUpdateUser(updatedUser);
+        saveUserProfile(updatedUser);
+        setEditingIsPremium(true);
+      }
+
+      setProActionMsg(`APPROVED! User "${req.userName}" payment verified. PRO VIP Membership activated.`);
     }
 
-    // Update registered users list
-    setAllRegisteredUsers(prev =>
-      prev.map(u => (u.id === req.userId || u.email === req.userEmail) ? { ...u, isPremium: true } : u)
-    );
-
-    // If current user is target user, upgrade active session as well
-    if (req.userId === user.id || user.email === req.userEmail) {
-      const updatedUser = { ...user, isPremium: true };
-      if (onUpdateUser) onUpdateUser(updatedUser);
-      saveUserProfile(updatedUser);
-      setEditingIsPremium(true);
-    }
-
-    setProActionMsg(`APPROVED! User "${req.userName}" payment verified. PRO VIP Membership activated.`);
     setTimeout(() => setProActionMsg(null), 3500);
     loadAllProRequests();
   };
@@ -990,9 +1003,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 >
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                     <div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-sm font-black text-white">{req.userName}</span>
                         <span className="text-xs text-slate-400 font-mono">({req.userEmail})</span>
+                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider ${
+                          req.paymentType === 'WHEEL_SPIN_FEE' 
+                            ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40' 
+                            : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                        }`}>
+                          {req.paymentType === 'WHEEL_SPIN_FEE' ? '🎡 Wheel Spin Fee' : '👑 PRO VIP Membership'}
+                        </span>
                       </div>
                       <div className="text-[11px] text-slate-400 mt-0.5">
                         Submitted: {new Date(req.timestamp).toLocaleString()} • Amount: <span className="text-emerald-400 font-bold font-mono">₹{req.amountINR} INR</span>
@@ -1007,7 +1027,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       )}
                       {req.status === 'approved' && (
                         <span className="px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center gap-1.5">
-                          <CheckCircle className="w-3.5 h-3.5 text-emerald-400" /> ACCEPTED & PRO ACTIVE
+                          <CheckCircle className="w-3.5 h-3.5 text-emerald-400" /> ACCEPTED BY ADMIN
                         </span>
                       )}
                       {req.status === 'declined' && (
@@ -1044,7 +1064,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           onClick={() => handleApproveProRequest(req)}
                           className="flex-1 sm:flex-none px-4 py-2 rounded-xl bg-emerald-500 text-slate-950 font-black text-xs uppercase hover:bg-emerald-400 transition flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-500/20"
                         >
-                          <CheckCircle className="w-4 h-4" /> Accept & Activate PRO
+                          <CheckCircle className="w-4 h-4" />
+                          <span>{req.paymentType === 'WHEEL_SPIN_FEE' ? 'Accept & Unlock Spin' : 'Accept & Activate PRO'}</span>
                         </button>
                         <button
                           onClick={() => handleDeclineProRequest(req)}

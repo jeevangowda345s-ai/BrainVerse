@@ -473,7 +473,7 @@ export async function fetchProUpgradeRequestsFromFirestore(): Promise<ProUpgrade
   }
 }
 
-// Update PRO Request status & grant Premium to User if approved
+// Update PRO Request status & grant Premium/Spin access to User if approved
 export async function updateProUpgradeRequestInFirestore(
   requestId: string,
   userId: string,
@@ -482,6 +482,9 @@ export async function updateProUpgradeRequestInFirestore(
 ): Promise<void> {
   try {
     const reqRef = doc(db, 'pro_upgrade_requests', requestId);
+    const reqSnap = await getDoc(reqRef);
+    const reqData = reqSnap.exists() ? reqSnap.data() : null;
+
     await updateDoc(reqRef, {
       status,
       declineReason: declineReason || null,
@@ -490,10 +493,17 @@ export async function updateProUpgradeRequestInFirestore(
 
     if (status === 'approved' && userId) {
       const userRef = doc(db, 'users', userId);
-      await updateDoc(userRef, {
-        isPremium: true,
-        updatedAt: new Date().toISOString()
-      });
+      if (reqData && reqData.paymentType === 'WHEEL_SPIN_FEE') {
+        await updateDoc(userRef, {
+          lastWheelSpinDate: '',
+          updatedAt: new Date().toISOString()
+        });
+      } else {
+        await updateDoc(userRef, {
+          isPremium: true,
+          updatedAt: new Date().toISOString()
+        });
+      }
     }
   } catch (err) {
     console.error('Error updating PRO request status in Firestore:', err);
